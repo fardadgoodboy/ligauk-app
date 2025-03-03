@@ -11,6 +11,11 @@ const Team = sequelize.define('Team', {
         allowNull: false,
         unique: true
     },
+    walletCode: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true
+    },
     leaderId: {
         type: DataTypes.INTEGER,
         allowNull: false

@@ -4,20 +4,41 @@
     <meta charset="UTF-8">
     <title>ثبت نام دانش‌آموز</title>
     <link rel="stylesheet" href="/css/style.css">
+    <script>
+      // نمایش پیام خطا در صورت وجود در URL
+      window.addEventListener('load', function() {
+        const params = new URLSearchParams(window.location.search);
+        const error = params.get('error');
+        if (error) {
+          document.getElementById('error-message').textContent = error;
+          document.getElementById('error-message').style.display = 'block';
+        }
+      });
+    </script>
 </head>
 <body>
-    <h1>ثبت نام دانش‌آموز</h1>
-    <form action="/register" method="POST">
-        <label>کد ملی:</label>
-        <input type="text" name="nationalId" required /><br/>
-        <label>نام:</label>
-        <input type="text" name="firstName" required /><br/>
-        <label>نام خانوادگی:</label>
-        <input type="text" name="lastName" required /><br/>
-        <label>شماره همراه:</label>
-        <input type="text" name="mobile" required /><br/>
-        <button type="submit">ثبت نام</button>
-    </form>
-    <p>قبلاً ثبت‌نام کرده‌اید؟ <a href="/login">ورود</a></p>
+  <header class="site-header">
+      <div class="header-left"><a href="/logout"><button>خروج</button></a></div>
+      <div class="header-center"><h2>ثبت نام</h2></div>
+      <div class="header-right"><img src="/images/logo.png" alt="Logo" class="logo"></div>
+  </header>
+  <div class="center-form">
+      <div class="form-container">
+          <div id="error-message" class="error-message" style="display:none;"></div>
+          <h1>ثبت نام دانش‌آموز</h1>
+          <form action="/register" method="POST">
+              <label>کد ملی:</label>
+              <input type="text" name="nationalId" placeholder="0123456789" pattern="\d{10}" required /><br/>
+              <label>نام:</label>
+              <input type="text" name="firstName" required /><br/>
+              <label>نام خانوادگی:</label>
+              <input type="text" name="lastName" required /><br/>
+              <label>شماره همراه:</label>
+              <input type="text" name="mobile" placeholder="09123456789" pattern="09\d{9}" required /><br/>
+              <button type="submit">ثبت نام</button>
+          </form>
+          <p>قبلاً ثبت‌نام کرده‌اید؟ <a href="/login">ورود</a></p>
+      </div>
+  </div>
 </body>
 </html>

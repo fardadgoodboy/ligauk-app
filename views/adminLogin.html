@@ -4,16 +4,36 @@
     <meta charset="UTF-8">
     <title>ورود ادمین</title>
     <link rel="stylesheet" href="/css/style.css">
+    <script>
+      window.addEventListener('load', function() {
+        const params = new URLSearchParams(window.location.search);
+        const error = params.get('error');
+        if (error) {
+          document.getElementById('error-message').textContent = error;
+          document.getElementById('error-message').style.display = 'block';
+        }
+      });
+    </script>
 </head>
 <body>
-    <h1>ورود ادمین</h1>
-    <form action="/admin" method="POST">
-        <label>نام کاربری:</label>
-        <input type="text" name="username" required /><br/>
-        <label>رمز عبور:</label>
-        <input type="password" name="password" required /><br/>
-        <button type="submit">ورود</button>
-    </form>
-    <p>بازگشت به <a href="/login">ورود</a></p>
+  <header class="site-header">
+      <div class="header-left"><a href="/logout"><button>خروج</button></a></div>
+      <div class="header-center"><h2>ورود ادمین</h2></div>
+      <div class="header-right"><img src="/images/logo.png" alt="Logo" class="logo"></div>
+  </header>
+  <div class="center-form">
+      <div class="form-container">
+          <div id="error-message" class="error-message" style="display:none;"></div>
+          <h1>ورود ادمین</h1>
+          <form action="/admin" method="POST">
+              <label>نام کاربری:</label>
+              <input type="text" name="username" required /><br/>
+              <label>رمز عبور:</label>
+              <input type="password" name="password" required /><br/>
+              <button type="submit">ورود</button>
+          </form>
+          <p>بازگشت به <a href="/login">ورود</a></p>
+      </div>
+  </div>
 </body>
 </html>

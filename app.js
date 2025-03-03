@@ -54,7 +54,15 @@ app.post('/register', async (req, res) => {
 });
 
 // صفحه ورود (دانش‌آموز/داور)
+// اگر کاربر قبلاً لاگین کرده باشد، مستقیماً به پنل هدایت می‌شود.
 app.get('/login', (req, res) => {
+    if(req.session.user){
+        if(req.session.user.role === 'student'){
+            return res.redirect('/student');
+        } else if(req.session.user.role === 'judge'){
+            return res.redirect('/judge');
+        }
+    }
     res.sendFile(path.join(__dirname, 'views', 'login.html'));
 });
 
@@ -88,10 +96,19 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// مسیر خروج (Logout)
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/login');
+});
+
 // ------------- مسیرهای مربوط به پنل ادمین ------------- //
 
 // صفحه ورود ادمین (دبیر)
 app.get('/admin', (req, res) => {
+    if(req.session.admin) {
+        return res.redirect('/admin/panel');
+    }
     res.sendFile(path.join(__dirname, 'views', 'adminLogin.html'));
 });
 
@@ -124,7 +141,7 @@ app.get('/admin/panel', async (req, res) => {
                 <td>${user.role}</td>
                 <td>${user.active}</td>
                 <td>
-                    <a href="/admin/edit/${user.id}">ویرایش</a> |
+                    <a href="/admin/edit/${user.id}" target="_blank">ویرایش</a> |
                     <form action="/admin/delete/${user.id}" method="POST" style="display:inline;">
                         <button type="submit" onclick="return confirm('آیا مطمئن هستید؟')">حذف</button>
                     </form>
@@ -142,7 +159,7 @@ app.get('/admin/panel', async (req, res) => {
         </head>
         <body>
             <h1>پنل ادمین</h1>
-            <a href="/admin/team">مدیریت تیم‌ها</a>
+            <a href="/admin/team" target="_blank"><button>مدیریت تیم‌ها</button></a>
             <table border="1" cellpadding="5" cellspacing="0">
                 <tr>
                     <th>ID</th>
@@ -217,7 +234,6 @@ app.get('/admin/edit/:id', async (req, res) => {
     }
 });
 
-// پردازش ویرایش کاربر (ادمین)
 app.post('/admin/edit/:id', async (req, res) => {
     if(!req.session.admin) {
         return res.redirect('/admin');
@@ -242,7 +258,6 @@ app.post('/admin/edit/:id', async (req, res) => {
     }
 });
 
-// حذف کاربر (ادمین)
 app.post('/admin/delete/:id', async (req, res) => {
     if(!req.session.admin) {
         return res.redirect('/admin');
@@ -256,251 +271,7 @@ app.post('/admin/delete/:id', async (req, res) => {
     }
 });
 
-// ------------- مسیرهای مربوط به پنل‌های کاربری ------------- //
-
-// پنل دانش‌آموز
-app.get('/student', (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    res.sendFile(path.join(__dirname, 'views', 'studentPanel.html'));
-});
-
-// پنل داور
-app.get('/judge', (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'judge'){
-        return res.redirect('/login');
-    }
-    res.sendFile(path.join(__dirname, 'views', 'judgePanel.html'));
-});
-
-
-// ------------- مسیرهای مربوط به تیم‌ها (بخش دانش‌آموز) ------------- //
-
-// نمایش صفحه مدیریت تیم
-app.get('/team', async (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    try {
-        const user = await User.findByPk(req.session.user.id);
-        let html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>مدیریت تیم</title>
-            <link rel="stylesheet" href="/css/style.css">
-        </head>
-        <body>
-            <h1>مدیریت تیم</h1>
-        `;
-        if(user.teamId){
-            const team = await Team.findByPk(user.teamId);
-            const members = await User.findAll({ where: { teamId: team.id } });
-            html += `<h2>اطلاعات تیم</h2>
-            <p>نام تیم: ${team.teamName}</p>
-            <p>کد تیم: ${team.teamCode}</p>
-            <p>امتیاز: ${team.score}</p>
-            <h3>اعضا:</h3>
-            <ul>`;
-            members.forEach(member => {
-                html += `<li>${member.firstName} ${member.lastName} ${team.leaderId === member.id ? '(سرگروه)' : ''}</li>`;
-            });
-            html += `</ul>`;
-            if(team.leaderId === user.id){
-                html += `<form action="/team/delete" method="POST">
-                    <button type="submit" onclick="return confirm('آیا مطمئن هستید؟ حذف تیم تمامی اعضا را از تیم خارج می‌کند.')">حذف تیم</button>
-                </form>`;
-            } else {
-                html += `<a href="/team/leave" onclick="return confirm('آیا مطمئن هستید که می‌خواهید از تیم خارج شوید؟')"><button>خروج از تیم</button></a>`;
-            }
-        } else {
-            html += `<p>شما عضو هیچ تیمی نیستید.</p>
-            <a href="/team/create"><button>ایجاد تیم</button></a>
-            <a href="/team/join"><button>ملحق شدن به تیم</button></a>`;
-        }
-        html += `<br/><a href="/student">بازگشت به پنل دانش‌آموز</a>`;
-        html += `</body></html>`;
-        res.send(html);
-    } catch(err) {
-        console.error(err);
-        res.send("خطا در نمایش اطلاعات تیم.");
-    }
-});
-
-// فرم ایجاد تیم
-app.get('/team/create', async (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    const user = await User.findByPk(req.session.user.id);
-    if(user.teamId){
-        return res.send("شما قبلاً عضو یک تیم هستید. برای ایجاد تیم جدید ابتدا از تیم فعلی خارج شوید.");
-    }
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>ایجاد تیم</title>
-        <link rel="stylesheet" href="/css/style.css">
-    </head>
-    <body>
-        <h1>ایجاد تیم</h1>
-        <form action="/team/create" method="POST">
-            <label>نام تیم:</label>
-            <input type="text" name="teamName" required /><br/>
-            <button type="submit">ایجاد تیم</button>
-        </form>
-        <a href="/team">بازگشت</a>
-    </body>
-    </html>
-    `;
-    res.send(html);
-});
-
-// پردازش ایجاد تیم
-app.post('/team/create', async (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    try {
-        const user = await User.findByPk(req.session.user.id);
-        if(user.teamId){
-            return res.send("شما قبلاً عضو یک تیم هستید.");
-        }
-        const { teamName } = req.body;
-        let teamCode;
-        let exists = true;
-        while(exists) {
-            teamCode = Math.floor(10000000 + Math.random() * 90000000).toString();
-            const teamExist = await Team.findOne({ where: { teamCode } });
-            if(!teamExist) {
-                exists = false;
-            }
-        }
-        const newTeam = await Team.create({
-            teamName,
-            teamCode,
-            leaderId: user.id
-        });
-        user.teamId = newTeam.id;
-        await user.save();
-        res.redirect('/team');
-    } catch(err) {
-        console.error(err);
-        res.send("خطا در ایجاد تیم.");
-    }
-});
-
-// فرم ملحق شدن به تیم
-app.get('/team/join', async (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    const user = await User.findByPk(req.session.user.id);
-    if(user.teamId){
-        return res.send("شما قبلاً عضو یک تیم هستید.");
-    }
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>ملحق شدن به تیم</title>
-        <link rel="stylesheet" href="/css/style.css">
-    </head>
-    <body>
-        <h1>ملحق شدن به تیم</h1>
-        <form action="/team/join" method="POST">
-            <label>کد تیم (8 رقمی):</label>
-            <input type="text" name="teamCode" required /><br/>
-            <button type="submit">ملحق شدن</button>
-        </form>
-        <a href="/team">بازگشت</a>
-    </body>
-    </html>
-    `;
-    res.send(html);
-});
-
-// پردازش ملحق شدن به تیم
-app.post('/team/join', async (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    try {
-        const user = await User.findByPk(req.session.user.id);
-        if(user.teamId){
-            return res.send("شما قبلاً عضو یک تیم هستید.");
-        }
-        const { teamCode } = req.body;
-        const team = await Team.findOne({ where: { teamCode } });
-        if(!team){
-            return res.send("تیمی با این کد یافت نشد.");
-        }
-        const members = await User.findAll({ where: { teamId: team.id } });
-        if(members.length >= 3){
-            return res.send("تیم پر است.");
-        }
-        user.teamId = team.id;
-        await user.save();
-        res.redirect('/team');
-    } catch(err) {
-        console.error(err);
-        res.send("خطا در ملحق شدن به تیم.");
-    }
-});
-
-// خروج از تیم (برای اعضای عادی)
-app.get('/team/leave', async (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    try {
-        const user = await User.findByPk(req.session.user.id);
-        if(!user.teamId){
-            return res.send("شما عضو هیچ تیمی نیستید.");
-        }
-        const team = await Team.findByPk(user.teamId);
-        if(team.leaderId === user.id){
-            return res.send("سرگروه نمی‌تواند از تیم خارج شود. برای حذف تیم از گزینه حذف استفاده کنید.");
-        }
-        user.teamId = null;
-        await user.save();
-        res.redirect('/team');
-    } catch(err) {
-        console.error(err);
-        res.send("خطا در خروج از تیم.");
-    }
-});
-
-// حذف تیم (برای سرگروه)
-app.post('/team/delete', async (req, res) => {
-    if(!req.session.user || req.session.user.role !== 'student'){
-        return res.redirect('/login');
-    }
-    try {
-        const user = await User.findByPk(req.session.user.id);
-        if(!user.teamId){
-            return res.send("شما عضو هیچ تیمی نیستید.");
-        }
-        const team = await Team.findByPk(user.teamId);
-        if(team.leaderId !== user.id){
-            return res.send("فقط سرگروه می‌تواند تیم را حذف کند.");
-        }
-        await User.update({ teamId: null }, { where: { teamId: team.id } });
-        await Team.destroy({ where: { id: team.id } });
-        res.redirect('/team');
-    } catch(err) {
-        console.error(err);
-        res.send("خطا در حذف تیم.");
-    }
-});
-
-// ------------- مسیرهای مدیریت تیم‌ها در پنل ادمین ------------- //
-
+// مسیرهای مدیریت تیم‌ها در پنل ادمین
 app.get('/admin/team', async (req, res) => {
     if(!req.session.admin){
         return res.redirect('/admin');
@@ -519,7 +290,7 @@ app.get('/admin/team', async (req, res) => {
                 <td>${members.length}</td>
                 <td>${team.score}</td>
                 <td>
-                    <a href="/admin/team/edit/${team.id}">ویرایش</a> |
+                    <a href="/admin/team/edit/${team.id}" target="_blank">ویرایش</a> |
                     <form action="/admin/team/delete/${team.id}" method="POST" style="display:inline;">
                         <button type="submit" onclick="return confirm('آیا مطمئن هستید؟')">حذف</button>
                     </form>
@@ -548,7 +319,7 @@ app.get('/admin/team', async (req, res) => {
                 </tr>
                 ${teamRows}
             </table>
-            <a href="/admin/panel">بازگشت به پنل ادمین</a>
+            <a href="/admin/panel"><button>بازگشت به پنل ادمین</button></a>
         </body>
         </html>
         `;
@@ -559,7 +330,6 @@ app.get('/admin/team', async (req, res) => {
     }
 });
 
-// فرم ویرایش تیم (ادمین)
 app.get('/admin/team/edit/:id', async (req, res) => {
     if(!req.session.admin){
         return res.redirect('/admin');
@@ -590,7 +360,7 @@ app.get('/admin/team/edit/:id', async (req, res) => {
                 <input type="number" name="score" value="${team.score}" required /><br/>
                 <button type="submit">به‌روزرسانی تیم</button>
             </form>
-            <a href="/admin/team">بازگشت</a>
+            <a href="/admin/team"><button>بازگشت</button></a>
         </body>
         </html>
         `;
@@ -601,7 +371,6 @@ app.get('/admin/team/edit/:id', async (req, res) => {
     }
 });
 
-// پردازش ویرایش تیم (ادمین)
 app.post('/admin/team/edit/:id', async (req, res) => {
     if(!req.session.admin){
         return res.redirect('/admin');
@@ -624,7 +393,6 @@ app.post('/admin/team/edit/:id', async (req, res) => {
     }
 });
 
-// حذف تیم توسط ادمین
 app.post('/admin/team/delete/:id', async (req, res) => {
     if(!req.session.admin){
         return res.redirect('/admin');
@@ -640,6 +408,489 @@ app.post('/admin/team/delete/:id', async (req, res) => {
     } catch(err) {
         console.error(err);
         res.send("خطا در حذف تیم.");
+    }
+});
+
+// ------------- مسیرهای مربوط به پنل‌های کاربری ------------- //
+
+// پنل داور (بدون تغییر)
+app.get('/judge', (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'judge'){
+        return res.redirect('/login');
+    }
+    res.sendFile(path.join(__dirname, 'views', 'judgePanel.html'));
+});
+
+// پنل دانش‌آموز (داینامیک با سه کادر: اطلاعات کاربری، اطلاعات تیم و کیف پول)
+app.get('/student', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>پنل دانش‌آموز</title>
+            <link rel="stylesheet" href="/css/style.css">
+        </head>
+        <body>
+            <div class="logout"><a href="/logout"><button>خروج</button></a></div>
+            <h1>پنل دانش‌آموز</h1>
+            <div class="panel-container">
+        `;
+        // کادر اطلاعات کاربری
+        html += `<div class="box user-info">
+                    <h2>اطلاعات کاربری</h2>
+                    <p>نام: ${user.firstName} ${user.lastName}</p>
+                    <p>کد ملی: ${user.nationalId}</p>
+                    <p>شماره همراه: ${user.mobile}</p>
+                    <button onclick="openModal('/student/updateMobile')">تغییر شماره همراه</button>
+                 </div>`;
+        // کادر اطلاعات تیم
+        if (user.teamId) {
+            const team = await Team.findByPk(user.teamId);
+            const members = await User.findAll({ where: { teamId: team.id } });
+            let memberList = "";
+            members.forEach(member => {
+                memberList += `<li>${member.firstName} ${member.lastName} ${team.leaderId === member.id ? '(سرگروه)' : ''}</li>`;
+            });
+            html += `<div class="box team-info">
+                        <h2>اطلاعات تیم</h2>
+                        <p>نام تیم: ${team.teamName}</p>
+                        <p>کد تیم (8 رقمی): ${team.teamCode}</p>
+                        <ul>اعضا:
+                           ${memberList}
+                        </ul>
+                        <button onclick="openModal('/team')">مدیریت تیم</button>
+                     </div>`;
+            // کادر کیف پول (امتیازات)
+            let availableTransfer = 0;
+            if (team.score > 100) {
+                availableTransfer = Math.min(Math.floor(team.score * 0.3), team.score - 100);
+            }
+            html += `<div class="box wallet-info">
+                        <h2>کیف پول</h2>
+                        <p>کد انتقال (4 رقمی): ${team.walletCode}</p>
+                        <p>امتیاز کل: ${team.score}</p>
+                        <p>امتیاز قابل برداشت: ${availableTransfer}</p>`;
+            if (team.leaderId === user.id) {
+                html += `<form action="/student/wallet/transfer" method="POST">
+                            <label>کد انتقال گروه مقصد (4 رقمی):</label>
+                            <input type="text" name="destWalletCode" required /><br/>
+                            <label>مبلغ انتقال:</label>
+                            <input type="number" name="amount" required /><br/>
+                            <button type="submit">انتقال امتیاز</button>
+                         </form>`;
+            }
+            html += `</div>`;
+        } else {
+            html += `<div class="box team-info">
+                        <h2>اطلاعات تیم</h2>
+                        <p>شما عضو هیچ تیمی نیستید.</p>
+                        <button onclick="openModal('/team')">مدیریت تیم</button>
+                     </div>`;
+        }
+        html += `</div>
+            <!-- Modal Overlay -->
+            <div id="modal-overlay" class="modal-overlay">
+              <div id="modal-content" class="modal-content">
+                <button class="modal-close" onclick="closeModal()">X</button>
+              </div>
+            </div>
+            <script src="/js/modal.js"></script>
+        </body>
+        </html>
+        `;
+        res.send(html);
+    } catch (err) {
+        console.error(err);
+        res.send("خطا در بارگذاری پنل دانش‌آموز.");
+    }
+});
+
+// مسیر تغییر شماره همراه دانش‌آموز
+app.get('/student/updateMobile', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>تغییر شماره همراه</title>
+            <link rel="stylesheet" href="/css/style.css">
+        </head>
+        <body>
+            <h1>تغییر شماره همراه</h1>
+            <form action="/student/updateMobile" method="POST">
+                <label>شماره همراه جدید:</label>
+                <input type="text" name="mobile" value="${user.mobile}" required /><br/>
+                <button type="submit">بروزرسانی</button>
+            </form>
+            <button onclick="closeModal()">بستن</button>
+        </body>
+        </html>
+        `;
+        res.send(html);
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در دریافت اطلاعات.");
+    }
+});
+
+app.post('/student/updateMobile', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const { mobile } = req.body;
+        const user = await User.findByPk(req.session.user.id);
+        user.mobile = mobile;
+        await user.save();
+        res.redirect('/student');
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در بروزرسانی شماره همراه.");
+    }
+});
+
+// ------------- مسیرهای مربوط به تیم‌ها ------------- //
+
+app.get('/team', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>مدیریت تیم</title>
+            <link rel="stylesheet" href="/css/style.css">
+        </head>
+        <body>
+            <h1>مدیریت تیم</h1>
+        `;
+        if(user.teamId){
+            const team = await Team.findByPk(user.teamId);
+            const members = await User.findAll({ where: { teamId: team.id } });
+            html += `<h2>اطلاعات تیم</h2>
+            <p>نام تیم: ${team.teamName}</p>
+            <p>کد تیم: ${team.teamCode}</p>
+            <p>امتیاز: ${team.score}</p>
+            <ul>`;
+            members.forEach(member => {
+                html += `<li>${member.firstName} ${member.lastName} ${team.leaderId === member.id ? '(سرگروه)' : ''}</li>`;
+            });
+            html += `</ul>`;
+            if(team.leaderId === user.id){
+                html += `<form action="/team/delete" method="POST">
+                    <button type="submit" onclick="return confirm('آیا مطمئن هستید؟ حذف تیم تمامی اعضا را از تیم خارج می‌کند.')">حذف تیم</button>
+                </form>`;
+            } else {
+                html += `<button onclick="if(confirm('آیا مطمئن هستید که می‌خواهید از تیم خارج شوید؟')) { window.location.href='/team/leave' }">خروج از تیم</button>`;
+            }
+        } else {
+            html += `<p>شما عضو هیچ تیمی نیستید.</p>
+            <button onclick="window.location.href='/team/create'">ایجاد تیم</button>
+            <button onclick="window.location.href='/team/join'">ملحق شدن به تیم</button>`;
+        }
+        html += `<br/><button onclick="closeModal()">بستن</button>`;
+        html += `</body></html>`;
+        res.send(html);
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در نمایش اطلاعات تیم.");
+    }
+});
+
+app.get('/team/create', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    const user = await User.findByPk(req.session.user.id);
+    if(user.teamId){
+        return res.send("شما قبلاً عضو یک تیم هستید. برای ایجاد تیم جدید ابتدا از تیم فعلی خارج شوید.");
+    }
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>ایجاد تیم</title>
+        <link rel="stylesheet" href="/css/style.css">
+    </head>
+    <body>
+        <h1>ایجاد تیم</h1>
+        <form action="/team/create" method="POST">
+            <label>نام تیم:</label>
+            <input type="text" name="teamName" required /><br/>
+            <button type="submit">ایجاد تیم</button>
+        </form>
+        <button onclick="closeModal()">بستن</button>
+    </body>
+    </html>
+    `;
+    res.send(html);
+});
+
+app.post('/team/create', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        if(user.teamId){
+            return res.send("شما قبلاً عضو یک تیم هستید.");
+        }
+        const { teamName } = req.body;
+        let teamCode;
+        let exists = true;
+        while(exists) {
+            teamCode = Math.floor(10000000 + Math.random() * 90000000).toString();
+            const teamExist = await Team.findOne({ where: { teamCode } });
+            if(!teamExist) {
+                exists = false;
+            }
+        }
+        // تولید کد walletCode 4 رقمی
+        let walletCode;
+        exists = true;
+        while(exists) {
+            walletCode = Math.floor(1000 + Math.random() * 9000).toString();
+            const codeExist = await Team.findOne({ where: { walletCode } });
+            if(!codeExist) {
+                exists = false;
+            }
+        }
+        const newTeam = await Team.create({
+            teamName,
+            teamCode,
+            walletCode,
+            leaderId: user.id
+        });
+        user.teamId = newTeam.id;
+        await user.save();
+        res.redirect('/team');
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در ایجاد تیم.");
+    }
+});
+
+app.get('/team/join', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    const user = await User.findByPk(req.session.user.id);
+    if(user.teamId){
+        return res.send("شما قبلاً عضو یک تیم هستید.");
+    }
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>ملحق شدن به تیم</title>
+        <link rel="stylesheet" href="/css/style.css">
+    </head>
+    <body>
+        <h1>ملحق شدن به تیم</h1>
+        <form action="/team/join" method="POST">
+            <label>کد تیم (8 رقمی):</label>
+            <input type="text" name="teamCode" required /><br/>
+            <button type="submit">ملحق شدن</button>
+        </form>
+        <button onclick="closeModal()">بستن</button>
+    </body>
+    </html>
+    `;
+    res.send(html);
+});
+
+app.post('/team/join', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        if(user.teamId){
+            return res.send("شما قبلاً عضو یک تیم هستید.");
+        }
+        const { teamCode } = req.body;
+        const team = await Team.findOne({ where: { teamCode } });
+        if(!team){
+            return res.send("تیمی با این کد یافت نشد.");
+        }
+        const members = await User.findAll({ where: { teamId: team.id } });
+        if(members.length >= 3){
+            return res.send("تیم پر است.");
+        }
+        user.teamId = team.id;
+        await user.save();
+        res.redirect('/team');
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در ملحق شدن به تیم.");
+    }
+});
+
+app.get('/team/leave', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        if(!user.teamId){
+            return res.send("شما عضو هیچ تیمی نیستید.");
+        }
+        const team = await Team.findByPk(user.teamId);
+        if(team.leaderId === user.id){
+            return res.send("سرگروه نمی‌تواند از تیم خارج شود. برای حذف تیم از گزینه حذف استفاده کنید.");
+        }
+        user.teamId = null;
+        await user.save();
+        res.redirect('/team');
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در خروج از تیم.");
+    }
+});
+
+app.post('/team/delete', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        if(!user.teamId){
+            return res.send("شما عضو هیچ تیمی نیستید.");
+        }
+        const team = await Team.findByPk(user.teamId);
+        if(team.leaderId !== user.id){
+            return res.send("فقط سرگروه می‌تواند تیم را حذف کند.");
+        }
+        await User.update({ teamId: null }, { where: { teamId: team.id } });
+        await Team.destroy({ where: { id: team.id } });
+        res.redirect('/team');
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در حذف تیم.");
+    }
+});
+
+// ------------- مسیرهای مربوط به انتقال امتیاز (کیف پول) ------------- //
+
+// مرحله اول: دریافت اطلاعات انتقال و نمایش صفحه تایید
+app.post('/student/wallet/transfer', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        if(!user.teamId) {
+            return res.send("شما عضو هیچ تیمی نیستید.");
+        }
+        const team = await Team.findByPk(user.teamId);
+        if(team.leaderId !== user.id) {
+            return res.send("فقط سرگروه می‌تواند امتیاز انتقال دهد.");
+        }
+        const { destWalletCode, amount } = req.body;
+        const transferAmount = parseInt(amount);
+        if(transferAmount <= 0) {
+            return res.send("مبلغ انتقال نامعتبر است.");
+        }
+        let availableTransfer = 0;
+        if (team.score > 100) {
+            availableTransfer = Math.min(Math.floor(team.score * 0.3), team.score - 100);
+        }
+        if(transferAmount > availableTransfer) {
+            return res.send("مبلغ انتقال بیشتر از حد مجاز است.");
+        }
+        // پیدا کردن تیم مقصد از روی walletCode
+        const destTeam = await Team.findOne({ where: { walletCode: destWalletCode } });
+        if(!destTeam) {
+            return res.send("تیم مقصد یافت نشد.");
+        }
+        if(destTeam.id === team.id) {
+            return res.send("تیم مقصد نمی‌تواند تیم خودتان باشد.");
+        }
+        // نمایش صفحه تایید انتقال
+        let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>تایید انتقال امتیاز</title>
+            <link rel="stylesheet" href="/css/style.css">
+        </head>
+        <body>
+            <h1>تایید انتقال امتیاز</h1>
+            <p>نام تیم مقصد: ${destTeam.teamName}</p>
+            <p>مبلغ انتقال: ${transferAmount}</p>
+            <form action="/student/wallet/transfer/confirm" method="POST">
+                <input type="hidden" name="destTeamId" value="${destTeam.id}" />
+                <input type="hidden" name="amount" value="${transferAmount}" />
+                <button type="submit">بله، تایید می‌کنم</button>
+            </form>
+            <button onclick="closeModal()">خیر، انصراف</button>
+        </body>
+        </html>
+        `;
+        res.send(html);
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در انتقال امتیاز.");
+    }
+});
+
+// مرحله دوم: تایید نهایی و انتقال امتیاز
+app.post('/student/wallet/transfer/confirm', async (req, res) => {
+    if(!req.session.user || req.session.user.role !== 'student'){
+        return res.redirect('/login');
+    }
+    try {
+        const user = await User.findByPk(req.session.user.id);
+        if(!user.teamId) {
+            return res.send("شما عضو هیچ تیمی نیستید.");
+        }
+        const team = await Team.findByPk(user.teamId);
+        if(team.leaderId !== user.id) {
+            return res.send("فقط سرگروه می‌تواند امتیاز انتقال دهد.");
+        }
+        const { destTeamId, amount } = req.body;
+        const transferAmount = parseInt(amount);
+        let availableTransfer = 0;
+        if (team.score > 100) {
+            availableTransfer = Math.min(Math.floor(team.score * 0.3), team.score - 100);
+        }
+        if(transferAmount > availableTransfer) {
+            return res.send("مبلغ انتقال بیشتر از حد مجاز است.");
+        }
+        const destTeam = await Team.findByPk(destTeamId);
+        if(!destTeam) {
+            return res.send("تیم مقصد یافت نشد.");
+        }
+        if(destTeam.id === team.id) {
+            return res.send("تیم مقصد نمی‌تواند تیم خودتان باشد.");
+        }
+        // انجام انتقال: کسر از تیم مبدا و اضافه کردن به تیم مقصد
+        team.score -= transferAmount;
+        destTeam.score += transferAmount;
+        await team.save();
+        await destTeam.save();
+        res.redirect('/student');
+    } catch(err) {
+        console.error(err);
+        res.send("خطا در تایید انتقال امتیاز.");
     }
 });
 
