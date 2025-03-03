@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ورود</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <h1>ورود</h1>
+    <form action="/login" method="POST">
+        <label>کد ملی:</label>
+        <input type="text" name="nationalId" required /><br/>
+        <label>شماره همراه:</label>
+        <input type="text" name="mobile" required /><br/>
+        <button type="submit">ورود</button>
+    </form>
+    <p>ثبت نام نکرده‌اید؟ <a href="/register">ثبت نام</a></p>
+    <p>ورود ادمین؟ <a href="/admin">ورود ادمین</a></p>
+</body>
+</html>
