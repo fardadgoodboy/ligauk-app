@@ -1,22 +1,32 @@
 function openModal(url) {
-    const overlay = document.getElementById('modal-overlay');
-    // همیشه نمایش مودال را روی flex قرار می‌دهیم
-    overlay.style.display = 'flex';
     fetch(url)
-      .then(response => response.text())
-      .then(data => {
-          const modalContent = document.getElementById('modal-content');
-          // دکمه بسته شدن در بالا سمت چپ قرار می‌گیرد
-          modalContent.innerHTML = '<button class="modal-close" onclick="closeModal()">بستن</button>' + data;
-          overlay.classList.add('show');
-      })
-      .catch(error => {
-          console.error('Error loading modal content:', error);
-      });
-}
+        .then(response => response.text())
+        .then(html => {
+            let modalContainer = document.createElement("div");
+            modalContainer.classList.add("modal-container");
+            modalContainer.innerHTML = `
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        ${html}
+                    </div>
+                </div>
+            `;
 
-function closeModal() {
-    const overlay = document.getElementById('modal-overlay');
-    overlay.classList.remove('show');
-    overlay.style.display = 'none';
+            document.body.appendChild(modalContainer);
+
+            // بستن مودال وقتی روی پس‌زمینه کلیک شد
+            modalContainer.querySelector(".modal-overlay").addEventListener("click", function (e) {
+                if (e.target === this) {
+                    modalContainer.remove();
+                }
+            });
+
+            // بستن مودال با دکمه داخل مودال
+            modalContainer.querySelector(".modal-content").addEventListener("click", function (e) {
+                if (e.target.classList.contains("close-modal")) {
+                    modalContainer.remove();
+                }
+            });
+        })
+        .catch(error => console.error("خطا در دریافت مودال:", error));
 }
