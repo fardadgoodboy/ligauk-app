@@ -154,6 +154,7 @@ app.get('/admin/panel', async (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>پنل ادمین</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
@@ -198,6 +199,7 @@ app.get('/admin/edit/:id', async (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> 
             <title>ویرایش کاربر</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
@@ -302,6 +304,7 @@ app.get('/admin/team', async (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>مدیریت تیم‌ها</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
@@ -344,6 +347,7 @@ app.get('/admin/team/edit/:id', async (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>ویرایش تیم</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
@@ -433,6 +437,7 @@ app.get('/student', async (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>پنل دانش‌آموز</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
@@ -497,7 +502,7 @@ app.get('/student', async (req, res) => {
             <!-- Modal Overlay -->
             <div id="modal-overlay" class="modal-overlay">
               <div id="modal-content" class="modal-content">
-                <button class="modal-close" onclick="closeModal()">X</button>
+                <button class="modal-close" onclick="closeModal()">بستن</button>
               </div>
             </div>
             <script src="/js/modal.js"></script>
@@ -523,6 +528,7 @@ app.get('/student/updateMobile', async (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>تغییر شماره همراه</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
@@ -570,6 +576,7 @@ app.get('/team', async (req, res) => {
         const user = await User.findByPk(req.session.user.id);
         let html = `
         <!DOCTYPE html>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <html>
         <head>
             <meta charset="UTF-8">
@@ -625,6 +632,7 @@ app.get('/team/create', async (req, res) => {
     <html>
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>ایجاد تیم</title>
         <link rel="stylesheet" href="/css/style.css">
     </head>
@@ -699,6 +707,7 @@ app.get('/team/join', async (req, res) => {
     <html>
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>ملحق شدن به تیم</title>
         <link rel="stylesheet" href="/css/style.css">
     </head>
@@ -829,6 +838,7 @@ app.post('/student/wallet/transfer', async (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>تایید انتقال امتیاز</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>

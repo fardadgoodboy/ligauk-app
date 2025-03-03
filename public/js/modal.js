@@ -7,7 +7,7 @@ function openModal(url) {
       .then(data => {
           const modalContent = document.getElementById('modal-content');
           // دکمه بسته شدن در بالا سمت چپ قرار می‌گیرد
-          modalContent.innerHTML = '<button class="modal-close" onclick="closeModal()">×</button>' + data;
+          modalContent.innerHTML = '<button class="modal-close" onclick="closeModal()">بستن</button>' + data;
           overlay.classList.add('show');
       })
       .catch(error => {
