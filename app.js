@@ -166,91 +166,85 @@ app.get('/admin/edit/:id', async (req, res) => {
         if (!user) return res.send("کاربر یافت نشد.");
         
         const html = `
-        <div class="modal">
-            <h1>ویرایش کاربر</h1>
-            <form action="/admin/edit/${user.id}" method="POST">
-                <label>کد ملی:</label>
-                <input type="text" name="nationalId" value="${user.nationalId}" required><br>
-                <label>نام:</label>
-                <input type="text" name="firstName" value="${user.firstName}" required><br>
-                <label>نام خانوادگی:</label>
-                <input type="text" name="lastName" value="${user.lastName}" required><br>
-                <label>شماره همراه:</label>
-                <input type="text" name="mobile" value="${user.mobile}" required><br>
-                <label>نقش:</label>
-                <select name="role">
-                    <option value="student" ${user.role === 'student' ? 'selected' : ''}>دانش‌آموز</option>
-                    <option value="judge" ${user.role === 'judge' ? 'selected' : ''}>داور</option>
-                </select><br>
-                <label>فعال:</label>
-                <select name="active">
-                    <option value="true" ${user.active ? 'selected' : ''}>True</option>
-                    <option value="false" ${!user.active ? 'selected' : ''}>False</option>
-                </select><br>
-                <button type="submit">به‌روزرسانی</button>
-                <button onclick="closeModal()">بستن</button>
-            </form>
-        </div>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>ویرایش کاربر</title>
+            <link rel="stylesheet" href="/css/style.css">
+        </head>
+        <body>
+            <div class="modal-content">
+                <h1>ویرایش کاربر</h1>
+                <form action="/admin/edit/${user.id}" method="POST">
+                    <label>کد ملی:</label>
+                    <input type="text" name="nationalId" value="${user.nationalId}" required><br>
+                    <label>نام:</label>
+                    <input type="text" name="firstName" value="${user.firstName}" required><br>
+                    <label>نام خانوادگی:</label>
+                    <input type="text" name="lastName" value="${user.lastName}" required><br>
+                    <label>شماره همراه:</label>
+                    <input type="text" name="mobile" value="${user.mobile}" required><br>
+                    <label>نقش:</label>
+                    <select name="role">
+                        <option value="student" ${user.role === 'student' ? 'selected' : ''}>دانش‌آموز</option>
+                        <option value="judge" ${user.role === 'judge' ? 'selected' : ''}>داور</option>
+                    </select><br>
+                    <label>فعال:</label>
+                    <select name="active">
+                        <option value="true" ${user.active ? 'selected' : ''}>True</option>
+                        <option value="false" ${!user.active ? 'selected' : ''}>False</option>
+                    </select><br>
+                    <button type="submit">به‌روزرسانی</button>
+                </form>
+                <button onclick="window.location.href='/admin/panel'">بازگشت</button>
+            </div>
+        </body>
+        </html>
         `;
         res.send(html);
-    } catch (err) {
+    } catch(err) {
         console.error(err);
         res.redirect('/error?message=' + encodeURIComponent("خطا در دریافت اطلاعات کاربر.") + "&back=/admin/panel");
     }
 });
 
 
-app.get('/admin/edit/:id', async (req, res) => {
+
+app.post('/admin/edit/:id', async (req, res) => {
     if (!req.session.admin) return res.redirect('/admin');
     try {
+        const { nationalId, firstName, lastName, mobile, role, active } = req.body;
         const user = await User.findByPk(req.params.id);
-        if (!user) return res.send("کاربر یافت نشد.");
-        
-        const html = `
-        <div class="modal">
-            <h1>ویرایش کاربر</h1>
-            <form action="/admin/edit/${user.id}" method="POST">
-                <label>کد ملی:</label>
-                <input type="text" name="nationalId" value="${user.nationalId}" required><br>
-                <label>نام:</label>
-                <input type="text" name="firstName" value="${user.firstName}" required><br>
-                <label>نام خانوادگی:</label>
-                <input type="text" name="lastName" value="${user.lastName}" required><br>
-                <label>شماره همراه:</label>
-                <input type="text" name="mobile" value="${user.mobile}" required><br>
-                <label>نقش:</label>
-                <select name="role">
-                    <option value="student" ${user.role === 'student' ? 'selected' : ''}>دانش‌آموز</option>
-                    <option value="judge" ${user.role === 'judge' ? 'selected' : ''}>داور</option>
-                </select><br>
-                <label>فعال:</label>
-                <select name="active">
-                    <option value="true" ${user.active ? 'selected' : ''}>True</option>
-                    <option value="false" ${!user.active ? 'selected' : ''}>False</option>
-                </select><br>
-                <button type="submit">به‌روزرسانی</button>
-                <button type="button" class="close-modal">بستن</button>
-            </form>
-        </div>
-        `;
-        res.send(html);
+        if (!user) return res.redirect('/error?message=' + encodeURIComponent("کاربر یافت نشد.") + "&back=/admin/panel");
+        user.nationalId = nationalId;
+        user.firstName = firstName;
+        user.lastName = lastName;
+        user.mobile = mobile;
+        user.role = role;
+        user.active = active === 'true';
+        await user.save();
+        res.redirect('/admin/panel');
     } catch (err) {
         console.error(err);
-        res.redirect('/error?message=' + encodeURIComponent("خطا در دریافت اطلاعات کاربر.") + "&back=/admin/panel");
+        res.redirect('/error?message=' + encodeURIComponent("خطا در به‌روزرسانی کاربر.") + "&back=/admin/panel");
     }
 });
+
 
 
 app.post('/admin/delete/:id', async (req, res) => {
-    if(!req.session.admin) return res.redirect('/admin');
+    if (!req.session.admin) return res.redirect('/admin');
     try {
         await User.destroy({ where: { id: req.params.id } });
-        res.json({ success: true, message: "کاربر با موفقیت حذف شد." });
-    } catch(err) {
+        res.redirect('/admin/panel');
+    } catch (err) {
         console.error(err);
-        res.json({ success: false, message: "خطا در حذف کاربر." });
+        res.redirect('/error?message=' + encodeURIComponent("خطا در حذف کاربر.") + "&back=/admin/panel");
     }
 });
+
 
 // مدیریت تیم‌ها در پنل ادمین
 app.get('/admin/team', async (req, res) => {
@@ -309,25 +303,38 @@ app.get('/admin/team', async (req, res) => {
 });
 
 app.get('/admin/team/edit/:id', async (req, res) => {
-    if(!req.session.admin) return res.redirect('/admin');
+    if (!req.session.admin) return res.redirect('/admin');
     try {
         const team = await Team.findByPk(req.params.id);
-        if(!team) return res.send("تیم یافت نشد.");
+        if (!team) return res.send("تیم یافت نشد.");
+        
         const html = `
-        <div>
-            <h1>ویرایش تیم</h1>
-            <form action="/admin/team/edit/${team.id}" method="POST">
-                <label>نام تیم:</label>
-                <input type="text" name="teamName" value="${team.teamName}" required><br>
-                <label>کد تیم:</label>
-                <input type="text" name="teamCode" value="${team.teamCode}" required><br>
-                <label>سرگروه (آی‌دی کاربر):</label>
-                <input type="text" name="leaderId" value="${team.leaderId}" required><br>
-                <label>امتیاز:</label>
-                <input type="number" name="score" value="${team.score}" required><br>
-                <button type="submit">به‌روزرسانی تیم</button>
-            </form>
-        </div>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>ویرایش تیم</title>
+            <link rel="stylesheet" href="/css/style.css">
+        </head>
+        <body>
+            <div class="modal-content">
+                <h1>ویرایش تیم</h1>
+                <form action="/admin/team/edit/${team.id}" method="POST">
+                    <label>نام تیم:</label>
+                    <input type="text" name="teamName" value="${team.teamName}" required><br>
+                    <label>کد تیم:</label>
+                    <input type="text" name="teamCode" value="${team.teamCode}" required><br>
+                    <label>سرگروه (آی‌دی کاربر):</label>
+                    <input type="text" name="leaderId" value="${team.leaderId}" required><br>
+                    <label>امتیاز:</label>
+                    <input type="number" name="score" value="${team.score}" required><br>
+                    <button type="submit">به‌روزرسانی تیم</button>
+                </form>
+                <button onclick="window.location.href='/admin/team'">بازگشت</button>
+            </div>
+        </body>
+        </html>
         `;
         res.send(html);
     } catch(err) {
@@ -336,35 +343,38 @@ app.get('/admin/team/edit/:id', async (req, res) => {
     }
 });
 
+
+
 app.post('/admin/team/edit/:id', async (req, res) => {
-    if(!req.session.admin) return res.redirect('/admin');
+    if (!req.session.admin) return res.redirect('/admin');
     try {
         const { teamName, teamCode, leaderId, score } = req.body;
         const team = await Team.findByPk(req.params.id);
-        if(!team) return res.json({ success: false, message: "تیم یافت نشد." });
+        if (!team) return res.redirect('/error?message=' + encodeURIComponent("تیم یافت نشد.") + "&back=/admin/team");
         team.teamName = teamName;
         team.teamCode = teamCode;
         team.leaderId = leaderId;
         team.score = score;
         await team.save();
-        res.json({ success: true, message: "به‌روزرسانی تیم با موفقیت انجام شد." });
-    } catch(err) {
+        res.redirect('/admin/team');
+    } catch (err) {
         console.error(err);
-        res.json({ success: false, message: "خطا در به‌روزرسانی تیم." });
+        res.redirect('/error?message=' + encodeURIComponent("خطا در به‌روزرسانی تیم.") + "&back=/admin/team");
     }
 });
 
+
 app.post('/admin/team/delete/:id', async (req, res) => {
-    if(!req.session.admin) return res.redirect('/admin');
+    if (!req.session.admin) return res.redirect('/admin');
     try {
         const team = await Team.findByPk(req.params.id);
-        if(!team) return res.json({ success: false, message: "تیم یافت نشد." });
+        if (!team) return res.redirect('/error?message=' + encodeURIComponent("تیم یافت نشد.") + "&back=/admin/team");
         await User.update({ teamId: null }, { where: { teamId: team.id } });
         await Team.destroy({ where: { id: team.id } });
-        res.json({ success: true, message: "تیم با موفقیت حذف شد." });
-    } catch(err) {
+        res.redirect('/admin/team');
+    } catch (err) {
         console.error(err);
-        res.json({ success: false, message: "خطا در حذف تیم." });
+        res.redirect('/error?message=' + encodeURIComponent("خطا در حذف تیم.") + "&back=/admin/team");
     }
 });
 
@@ -796,19 +806,22 @@ app.get('/confirm', (req, res) => {
       <link rel="stylesheet" href="/css/style.css">
     </head>
     <body>
-      <div>
+      <div class="modal-content">
         <h1>تایید</h1>
         <p>${message}</p>
         <form action="${action}" method="POST">
           <button type="submit">بله</button>
+          <button type="button" onclick="window.location.href='${cancel}'">خیر</button>
         </form>
-        <button onclick="window.location.href='${cancel}'">خیر</button>
       </div>
     </body>
     </html>
     `;
     res.send(html);
 });
+
+
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
