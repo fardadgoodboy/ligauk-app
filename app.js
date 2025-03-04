@@ -8,7 +8,7 @@ const User = require('./models/User');
 const Team = require('./models/Team');
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -132,7 +132,6 @@ app.get('/admin/panel', async (req, res) => {
         <body>
             <h1>پنل ادمین</h1>
             <div class="admin-menu">
-                <button onclick="window.location.href='/admin/panel'">کاربران</button>
                 <button onclick="window.location.href='/admin/team'">تیم‌ها</button>
             </div>
             <table>
@@ -265,7 +264,9 @@ app.get('/admin/team', async (req, res) => {
                 <td>${team.score}</td>
                 <td>
                     <a href="/admin/team/edit/${team.id}" target="_blank">ویرایش</a> |
-                    <a href="javascript:void(0)" onclick="openModal('/confirm?message=' + encodeURIComponent('آیا مطمئن هستید؟ حذف تیم تمامی اعضا را از تیم خارج می‌کند.') + '&action=/admin/team/delete/${team.id}&cancel=/admin/team')">حذف</a>
+                    <form action="/admin/team/delete/${team.id}" method="POST" style="display:inline;">
+                        <button type="submit">حذف</button>
+                    </form>
                 </td>
             </tr>`;
         }
@@ -280,6 +281,9 @@ app.get('/admin/team', async (req, res) => {
         </head>
         <body>
             <h1>پنل مدیریت تیم‌ها</h1>
+            <div class="admin-menu">
+                <button onclick="window.location.href='/admin/panel'">کاربران</button>
+            </div>
             <table>
                 <tr>
                     <th>ID</th>
@@ -292,7 +296,6 @@ app.get('/admin/team', async (req, res) => {
                 </tr>
                 ${teamRows}
             </table>
-            <button onclick="window.location.href='/admin/panel'">بازگشت</button>
         </body>
         </html>
         `;
@@ -344,7 +347,6 @@ app.get('/admin/team/edit/:id', async (req, res) => {
         res.redirect('/error?message=' + encodeURIComponent("خطا در دریافت اطلاعات تیم.") + "&back=/admin/team");
     }
 });
-
 
 
 app.post('/admin/team/edit/:id', async (req, res) => {
@@ -503,6 +505,7 @@ app.get('/student/updateMobile', async (req, res) => {
                 <label>شماره همراه جدید:</label>
                 <input type="text" name="mobile" value="${user.mobile}" required><br>
                 <button type="submit">بروزرسانی</button>
+                <button type="button" class="close-modal">انصراف</button>
             </form>
         </div>
         `;
@@ -576,6 +579,7 @@ app.get('/team/create', async (req, res) => {
             <label>نام تیم:</label>
             <input type="text" name="teamName" required><br>
             <button type="submit">ایجاد تیم</button>
+            <button type="button" class="close-modal">انصراف</button>
         </form>
     </div>
     `;
@@ -626,6 +630,7 @@ app.get('/team/join', async (req, res) => {
             <label>کد تیم (8 رقمی):</label>
             <input type="text" name="teamCode" required><br>
             <button type="submit">ملحق شدن</button>
+            <button type="button" class="close-modal">انصراف</button>
         </form>
     </div>
     `;
@@ -636,20 +641,21 @@ app.post('/team/join', async (req, res) => {
     if(!req.session.user || req.session.user.role !== 'student') return res.redirect('/login');
     try {
         const user = await User.findByPk(req.session.user.id);
-        if(user.teamId) return res.redirect('/error?message=' + encodeURIComponent("شما قبلاً عضو یک تیم هستید.") + "&back=/team");
+        if(user.teamId) return res.redirect('/error?message=' + encodeURIComponent("شما قبلاً عضو یک تیم هستید.") + "&back=/student");
         const { teamCode } = req.body;
         const team = await Team.findOne({ where: { teamCode } });
-        if(!team) return res.redirect('/error?message=' + encodeURIComponent("تیمی با این کد یافت نشد.") + "&back=/team");
+        if(!team) return res.redirect('/error?message=' + encodeURIComponent("تیمی با این کد یافت نشد.") + "&back=/student");
         const members = await User.findAll({ where: { teamId: team.id } });
-        if(members.length >= 3) return res.redirect('/error?message=' + encodeURIComponent("تیم پر است.") + "&back=/team");
+        if(members.length >= 3) return res.redirect('/error?message=' + encodeURIComponent("تیم پر است.") + "&back=/student");
         user.teamId = team.id;
         await user.save();
         res.redirect('/student');
     } catch(err) {
         console.error(err);
-        res.redirect('/error?message=' + encodeURIComponent("خطا در ملحق شدن به تیم.") + "&back=/team");
+        res.redirect('/error?message=' + encodeURIComponent("خطا در ملحق شدن به تیم.") + "&back=/student");
     }
 });
+
 
 app.post('/team/leave', async (req, res) => {
     if (!req.session.user || req.session.user.role !== 'student') {
@@ -722,17 +728,27 @@ app.post('/student/wallet/transfer', async (req, res) => {
         if (destTeam.id === team.id) return res.redirect('/error?message=' + encodeURIComponent("تیم مقصد نمی‌تواند تیم خودتان باشد.") + "&back=/student");
 
         const html = `
-        <div class="modal">
-            <h1>تایید انتقال امتیاز</h1>
-            <p>نام تیم مقصد: ${destTeam.teamName}</p>
-            <p>مبلغ انتقال: ${transferAmount}</p>
-            <form action="/student/wallet/transfer/confirm" method="POST">
-                <input type="hidden" name="destTeamId" value="${destTeam.id}">
-                <input type="hidden" name="amount" value="${transferAmount}">
-                <button type="submit">بله، تایید می‌کنم</button>
-                <button type="button" class="close-modal">خیر، انصراف</button>
-            </form>
-        </div>
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>تایید</title>
+                <link rel="stylesheet" href="/css/style.css">
+            </head>
+            <body>
+                <div class="modal">
+                    <h1>تایید انتقال امتیاز</h1>
+                    <p>نام تیم مقصد: ${destTeam.teamName}</p>
+                    <p>مبلغ انتقال: ${transferAmount}</p>
+                    <form action="/student/wallet/transfer/confirm" method="POST">
+                        <input type="hidden" name="destTeamId" value="${destTeam.id}">
+                        <input type="hidden" name="amount" value="${transferAmount}">
+                        <button type="submit">بله، تایید می‌کنم</button>
+                        <button type="button" class="close-modal">انصراف</button>
+                    </form>
+                </div>
+            </body>
         `;
         res.send(html);
     } catch (err) {
@@ -808,51 +824,6 @@ app.get('/confirm', (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>تایید</title>
       <link rel="stylesheet" href="/css/style.css">
-      <style>
-        body {
-          background: #121212;
-          color: #e0e0e0;
-          font-family: 'Vazir', sans-serif;
-          margin: 0;
-          padding: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-        }
-        .modal-content {
-          background: #1e1e1e;
-          padding: 20px;
-          border-radius: 8px;
-          max-width: 500px;
-          width: 100%;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-          text-align: center;
-        }
-        .modal-content h1 {
-          margin-bottom: 10px;
-        }
-        .modal-content p {
-          margin-bottom: 20px;
-        }
-        .modal-content form button {
-          margin: 5px;
-          padding: 10px 15px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-family: 'Vazir', sans-serif;
-          font-size: 1rem;
-        }
-        .modal-content form button[type="submit"] {
-          background: #00bcd4;
-          color: #000;
-        }
-        .modal-content form button[type="button"] {
-          background: #d32f2f;
-          color: #fff;
-        }
-      </style>
     </head>
     <body>
       <div class="modal-content">
