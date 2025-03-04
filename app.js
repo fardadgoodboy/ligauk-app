@@ -247,6 +247,7 @@ app.post('/admin/delete/:id', async (req, res) => {
 
 
 // مدیریت تیم‌ها در پنل ادمین
+// مدیریت تیم‌ها در پنل ادمین
 app.get('/admin/team', async (req, res) => {
     if(!req.session.admin) return res.redirect('/admin');
     try {
@@ -264,7 +265,7 @@ app.get('/admin/team', async (req, res) => {
                 <td>${team.score}</td>
                 <td>
                     <a href="/admin/team/edit/${team.id}" target="_blank">ویرایش</a> |
-                    <a href="javascript:void(0)" onclick="openModal('/confirm?message=' + encodeURIComponent('آیا مطمئن هستید؟ حذف تیم تمامی اعضا را از تیم خارج می‌کند.') + '&action=/team/delete&cancel=/team')">حذف</a>
+                    <a href="javascript:void(0)" onclick="openModal('/confirm?message=' + encodeURIComponent('آیا مطمئن هستید؟ حذف تیم تمامی اعضا را از تیم خارج می‌کند.') + '&action=/admin/team/delete/${team.id}&cancel=/admin/team')">حذف</a>
                 </td>
             </tr>`;
         }
@@ -301,6 +302,7 @@ app.get('/admin/team', async (req, res) => {
         res.redirect('/error?message=' + encodeURIComponent("خطا در نمایش تیم‌ها.") + "&back=/admin/panel");
     }
 });
+
 
 app.get('/admin/team/edit/:id', async (req, res) => {
     if (!req.session.admin) return res.redirect('/admin');
@@ -365,18 +367,20 @@ app.post('/admin/team/edit/:id', async (req, res) => {
 
 
 app.post('/admin/team/delete/:id', async (req, res) => {
-    if (!req.session.admin) return res.redirect('/admin');
+    if(!req.session.admin) return res.redirect('/admin');
     try {
         const team = await Team.findByPk(req.params.id);
-        if (!team) return res.redirect('/error?message=' + encodeURIComponent("تیم یافت نشد.") + "&back=/admin/team");
+        if(!team) return res.redirect('/error?message=' + encodeURIComponent("تیم یافت نشد.") + "&back=/admin/team");
         await User.update({ teamId: null }, { where: { teamId: team.id } });
         await Team.destroy({ where: { id: team.id } });
         res.redirect('/admin/team');
-    } catch (err) {
+    } catch(err) {
         console.error(err);
         res.redirect('/error?message=' + encodeURIComponent("خطا در حذف تیم.") + "&back=/admin/team");
     }
 });
+
+
 
 // مسیرهای مربوط به پنل دانش‌آموز
 app.get('/judge', (req, res) => {
@@ -804,6 +808,51 @@ app.get('/confirm', (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>تایید</title>
       <link rel="stylesheet" href="/css/style.css">
+      <style>
+        body {
+          background: #121212;
+          color: #e0e0e0;
+          font-family: 'Vazir', sans-serif;
+          margin: 0;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+        }
+        .modal-content {
+          background: #1e1e1e;
+          padding: 20px;
+          border-radius: 8px;
+          max-width: 500px;
+          width: 100%;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          text-align: center;
+        }
+        .modal-content h1 {
+          margin-bottom: 10px;
+        }
+        .modal-content p {
+          margin-bottom: 20px;
+        }
+        .modal-content form button {
+          margin: 5px;
+          padding: 10px 15px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-family: 'Vazir', sans-serif;
+          font-size: 1rem;
+        }
+        .modal-content form button[type="submit"] {
+          background: #00bcd4;
+          color: #000;
+        }
+        .modal-content form button[type="button"] {
+          background: #d32f2f;
+          color: #fff;
+        }
+      </style>
     </head>
     <body>
       <div class="modal-content">
