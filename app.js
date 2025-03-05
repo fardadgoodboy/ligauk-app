@@ -1076,7 +1076,7 @@ app.get('/scoreboard/json', async (req, res) => {
     }
   });
 
-// Endpoint JSON برای جدول امتیازات
+// Endpoint JSON برای اسکوربورد
 app.get('/scoreboard/json', async (req, res) => {
     try {
       const teams = await Team.findAll();
@@ -1093,7 +1093,7 @@ app.get('/scoreboard/json', async (req, res) => {
     }
   });
   
-// صفحه کامل جدول امتیازات مسابقه (به‌روزرسانی هر 1 ثانیه)
+// صفحه کامل اسکوربورد مسابقه (به‌روزرسانی هر 1 ثانیه)
 app.get('/scoreboard/full', async (req, res) => {
     let myTeamId = null;
     if (req.session.user && req.session.user.role === 'student') {
@@ -1106,20 +1106,78 @@ app.get('/scoreboard/full', async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>جدول امتیازات مسابقه</title>
+      <title>اسکوربورد مسابقه</title>
       <link rel="stylesheet" href="/css/style-score.css">
+      <style>
+        body {
+          background: #000;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          position: relative;
+        }
+        .scoreboard-container {
+          position: relative;
+          width: 100%;
+          height: 100vh;
+        }
+        /* دایره‌ها: اندازه 3px، انتقال با انیمیشن */
+        .team-circle {
+          position: absolute;
+          width: 3px;
+          height: 3px;
+          border-radius: 50%;
+          background: white;
+          border: 1px solid white;
+          box-shadow: 0 0 3px rgba(255,255,255,0.5);
+          cursor: pointer;
+          transition: top 0.5s ease-in-out, left 0.5s ease-in-out, box-shadow 0.5s ease-in-out;
+          z-index: 2;
+        }
+        .team-circle.my-team {
+          background: #ff0000;
+          border-color: #ff0000;
+          box-shadow: 0 0 3px rgba(255,0,0,0.8);
+          z-index: 3;
+        }
+        /* خطوط امتیاز: از لبه‌های صفحه (left=0,right=0) و با transition */
+        .score-line {
+          position: absolute;
+          height: 1px;
+          background: rgba(255, 255, 255, 0.15);
+          left: 0;
+          right: 0;
+          transition: top 0.5s ease-in-out, box-shadow 0.5s ease-in-out;
+          box-shadow: 0 0 2px rgba(255,255,255,0.05);
+          z-index: 1;
+        }
+        .score-line.my-team-line {
+          background: rgba(255, 0, 0, 0.8);
+          box-shadow: 0 0 5px rgba(255, 0, 0, 0.8);
+        }
+        .tooltip {
+          position: absolute;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 0.9rem;
+          pointer-events: none;
+          white-space: nowrap;
+        }
+      </style>
     </head>
     <body>
       <div class="scoreboard-container" id="scoreboard-container"></div>
       <script>
         const myTeamId = ${myTeamId ? myTeamId : 'null'};
-        const fixedPositions = {}; // موقعیت افقی ثابت برای هر گروه
-  
+        const prevLinePositions = {}; // ذخیره موقعیت قبلی خطوط
+        
         async function updateScoreboard() {
-        try {
+          try {
             const response = await fetch('/scoreboard/json');
             const teams = await response.json();
-            // مرتب‌سازی گروه‌ها بر اساس teamCode (صعودی)
+            // مرتب‌سازی تیم‌ها بر اساس teamCode (صعودی)
             teams.sort((a, b) => a.teamCode.localeCompare(b.teamCode));
             const container = document.getElementById('scoreboard-container');
             const containerHeight = window.innerHeight;
@@ -1127,82 +1185,86 @@ app.get('/scoreboard/full', async (req, res) => {
             const topMargin = 50;
             const bottomMargin = 50;
             const availableHeight = containerHeight - topMargin - bottomMargin;
-            // حداقل فاصله از طرفین: 30px
+            // دایره‌ها باید حداقل 30px از لبه صفحه فاصله داشته باشند
             const leftMargin = 30, rightMargin = 30;
             const availableWidth = containerWidth - leftMargin - rightMargin;
             const gap = teams.length > 1 ? availableWidth / (teams.length - 1) : 0;
             
-            // برای اینکه انیمیشن اعمال شود، ما عناصر موجود را به‌روزرسانی می‌کنیم.
             teams.forEach((team, index) => {
-            // محاسبه موقعیت عمودی بر اساس امتیاز
-            const maxScore = Math.max(...teams.map(t => t.score), 1000);
-            const ratio = team.score / maxScore;
-            const topPos = topMargin + (1 - ratio) * availableHeight;
-            // موقعیت افقی ثابت بر اساس ترتیب مرتب‌شده
-            const leftPos = leftMargin + index * gap;
-            
-            // بررسی وجود عنصر دایره با آی‌دی مشخص
-            let circle = document.getElementById('circle-' + team.id);
-            if (!circle) {
+              const maxScore = Math.max(...teams.map(t => t.score), 1000);
+              const ratio = team.score / maxScore;
+              const topPos = topMargin + (1 - ratio) * availableHeight;
+              // موقعیت افقی بر اساس مرتب‌سازی (دایره‌ها از leftMargin شروع می‌شوند)
+              const leftPos = leftMargin + index * gap;
+              
+              // به‌روزرسانی یا ایجاد دایره تیم
+              let circle = document.getElementById('circle-' + team.id);
+              if (!circle) {
                 circle = document.createElement('div');
                 circle.id = 'circle-' + team.id;
                 circle.classList.add('team-circle');
                 circle.addEventListener('click', (e) => {
-                showTooltip(e, team);
+                  showTooltip(e, team);
                 });
                 container.appendChild(circle);
-            }
-            // به‌روزرسانی کلاس my-team در صورت نیاز
-            if (reqMyTeam(team.id)) { // تابع کمکی جهت بررسی اینکه آیا گروه، گروه دانش‌آموز است
+              }
+              if (typeof myTeamId === 'number' && myTeamId === team.id) {
                 circle.classList.add('my-team');
-            } else {
+              } else {
                 circle.classList.remove('my-team');
-            }
-            circle.style.top = topPos + 'px';
-            circle.style.left = leftPos + 'px';
-            
-            // بررسی وجود عنصر خط امتیاز
-            let scoreLine = document.getElementById('scoreline-' + team.id);
-            if (!scoreLine) {
+              }
+              circle.style.top = topPos + 'px';
+              circle.style.left = leftPos + 'px';
+              
+              // به‌روزرسانی یا ایجاد خط امتیاز
+              let scoreLine = document.getElementById('scoreline-' + team.id);
+              if (!scoreLine) {
                 scoreLine = document.createElement('div');
                 scoreLine.id = 'scoreline-' + team.id;
                 scoreLine.classList.add('score-line');
                 container.appendChild(scoreLine);
-            }
-            if (reqMyTeam(team.id)) {
+              }
+              if (typeof myTeamId === 'number' && myTeamId === team.id) {
                 scoreLine.classList.add('my-team-line');
-            } else {
+              } else {
                 scoreLine.classList.remove('my-team-line');
-            }
-            // خط از وسط دایره عبور می‌کند (دایره 3px → مرکز = 1.5px)
-            scoreLine.style.top = (topPos + 1.5) + 'px';
+              }
+              const newTop = topPos + 1.5;
+              scoreLine.style.top = newTop + 'px';
+              
+              // اعمال افکت درخشش: فقط اگر تغییر موقعیت بیشتر از 1px بوده باشد
+              if (!prevLinePositions[team.id] || Math.abs(newTop - prevLinePositions[team.id]) > 1) {
+                if (typeof myTeamId === 'number' && myTeamId === team.id) {
+                  scoreLine.style.boxShadow = "0 0 10px red";
+                } else {
+                  scoreLine.style.boxShadow = "0 0 10px blue";
+                }
+                setTimeout(() => {
+                  scoreLine.style.boxShadow = "0 0 2px rgba(255,255,255,0.05)";
+                }, 500);
+              }
+              prevLinePositions[team.id] = newTop;
             });
             
-            // حذف عناصری که در teams موجود نیستند (در صورت حذف گروه)
+            // حذف عناصری که در teams موجود نیستند
             const existingCircles = container.querySelectorAll('.team-circle');
             existingCircles.forEach(circle => {
-            const id = circle.id.replace('circle-', '');
-            if (!teams.find(t => t.id == id)) {
+              const id = circle.id.replace('circle-', '');
+              if (!teams.find(t => t.id == id)) {
                 circle.remove();
-            }
+              }
             });
             const existingLines = container.querySelectorAll('.score-line');
             existingLines.forEach(line => {
-            const id = line.id.replace('scoreline-', '');
-            if (!teams.find(t => t.id == id)) {
+              const id = line.id.replace('scoreline-', '');
+              if (!teams.find(t => t.id == id)) {
                 line.remove();
-            }
+              }
             });
-        } catch (error) {
+          } catch (error) {
             console.error('Error updating scoreboard:', error);
+          }
         }
-        }
-
-        // تابع کمکی جهت بررسی اینکه آیا گروه به دانش‌آموز مربوط است
-        function reqMyTeam(teamId) {
-        return (typeof myTeamId === 'number' && myTeamId === teamId);
-        }
-
         
         function showTooltip(e, team) {
           document.querySelectorAll('.tooltip').forEach(el => el.remove());
@@ -1229,6 +1291,7 @@ app.get('/scoreboard/full', async (req, res) => {
     `;
     res.send(html);
 });
+  
   
   
 
