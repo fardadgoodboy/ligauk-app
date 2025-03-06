@@ -10,7 +10,7 @@ const Team = require('./models/Team');
 const Transaction = require('./models/Transaction'); // Model for logging transactions
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware configuration
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -1363,10 +1363,68 @@ app.get('/scoreboard/full', async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>جدول امتیازات کامل</title>
+      <title>جدول امتیازات مسابقه</title>
       <link rel="stylesheet" href="/css/style-score.css">
+      <style>
+        body {
+          background: #000;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          position: relative;
+        }
+        .scoreboard-container {
+          position: relative;
+          width: 100%;
+          height: 100vh;
+        }
+        /* دایره‌ها: اندازه 3px، انتقال با انیمیشن */
+        .team-circle {
+          position: absolute;
+          width: 3px;
+          height: 3px;
+          border-radius: 50%;
+          background: white;
+          border: 1px solid white;
+          box-shadow: 0 0 3px rgba(255,255,255,0.5);
+          cursor: pointer;
+          transition: top 0.5s ease-in-out, left 0.5s ease-in-out, box-shadow 0.5s ease-in-out;
+          z-index: 2;
+        }
+        .team-circle.my-team {
+          background: #ff0000;
+          border-color: #ff0000;
+          box-shadow: 0 0 3px rgba(255,0,0,0.8);
+          z-index: 3;
+        }
+        /* خطوط امتیاز: از لبه‌های صفحه (left=0,right=0) و با transition */
+        .score-line {
+          position: absolute;
+          height: 1px;
+          background: rgba(255, 255, 255, 0.15);
+          left: 0;
+          right: 0;
+          transition: top 0.5s ease-in-out, box-shadow 0.5s ease-in-out;
+          box-shadow: 0 0 2px rgba(255,255,255,0.05);
+          z-index: 1;
+        }
+        .score-line.my-team-line {
+          background: rgba(255, 0, 0, 0.8);
+          box-shadow: 0 0 5px rgba(255, 0, 0, 0.8);
+        }
+        .tooltip {
+          position: absolute;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 0.9rem;
+          pointer-events: none;
+          white-space: nowrap;
+        }
+      </style>
     </head>
-    <body class="scoreboard">
+    <body>
       <div class="scoreboard-container" id="scoreboard-container"></div>
       <script>
         const myTeamId = ${myTeamId ? myTeamId : 'null'};
@@ -1427,13 +1485,19 @@ app.get('/scoreboard/full', async (req, res) => {
               scoreLine.style.top = newTop + 'px';
               
               if (!prevLinePositions[team.id] || Math.abs(newTop - prevLinePositions[team.id]) > 1) {
+                if (typeof myTeamId === 'number' && myTeamId === team.id) {
+                  scoreLine.style.boxShadow = "0 0 10px red";
+                } else {
+                  scoreLine.style.boxShadow = "0 0 10px blue";
+                }
                 setTimeout(() => {
-                  scoreLine.style.boxShadow = "";
+                  scoreLine.style.boxShadow = "0 0 2px rgba(255,255,255,0.05)";
                 }, 500);
               }
               prevLinePositions[team.id] = newTop;
             });
             
+            // حذف عناصری که در teams موجود نیستند
             const existingCircles = container.querySelectorAll('.team-circle');
             existingCircles.forEach(circle => {
               const id = circle.id.replace('circle-', '');
