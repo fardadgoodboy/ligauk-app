@@ -6,6 +6,7 @@ const session = require('express-session');
 const sequelize = require('./models/index');
 const User = require('./models/User');
 const Team = require('./models/Team');
+const Transaction = require('./models/Transaction'); // مدل تراکنش
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -81,7 +82,11 @@ app.get('/logout', (req, res) => {
     res.redirect('/login');
 });
 
+// ====================
 // مسیرهای مربوط به پنل ادمین
+// ====================
+
+// ورود ادمین
 app.get('/admin', (req, res) => {
     if(req.session.admin) return res.redirect('/admin/panel');
     res.sendFile(path.join(__dirname, 'views', 'adminLogin.html'));
@@ -97,67 +102,110 @@ app.post('/admin', (req, res) => {
     }
 });
 
-app.get('/admin/panel', async (req, res) => {
-    if(!req.session.admin) return res.redirect('/admin');
-    try {
-        const users = await User.findAll();
-        let userRows = '';
+// صفحه کاربران (ادمین) با جدول داینامیک و جستجوی ستونی
+app.get('/admin/panel', (req, res) => {
+  if(!req.session.admin) return res.redirect('/admin');
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>پنل ادمین - کاربران</title>
+      <link rel="stylesheet" href="/css/style.css">
+      <style>
+        table input { width: 90%; }
+      </style>
+  </head>
+  <body>
+      <div class="admin-menu">
+          <button onclick="window.location.href='/admin/team'">گروه‌ها</button>
+          <button onclick="window.location.href='/admin/transactions'">تراکنش‌ها</button>
+      </div>
+      <table id="usersTable" border="1" cellpadding="5" cellspacing="0">
+        <thead>
+          <tr>
+              <th>ID<br><input type="text" onkeyup="filterTable('usersTable', 0)" placeholder="جستجو"></th>
+              <th>کد ملی<br><input type="text" onkeyup="filterTable('usersTable', 1)" placeholder="جستجو"></th>
+              <th>نام<br><input type="text" onkeyup="filterTable('usersTable', 2)" placeholder="جستجو"></th>
+              <th>نام خانوادگی<br><input type="text" onkeyup="filterTable('usersTable', 3)" placeholder="جستجو"></th>
+              <th>شماره همراه<br><input type="text" onkeyup="filterTable('usersTable', 4)" placeholder="جستجو"></th>
+              <th>نقش<br><input type="text" onkeyup="filterTable('usersTable', 5)" placeholder="جستجو"></th>
+              <th>فعال<br><input type="text" onkeyup="filterTable('usersTable', 6)" placeholder="جستجو"></th>
+              <th>عملیات</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <script>
+      async function fetchUsers() {
+        const response = await fetch('/admin/users/json');
+        const users = await response.json();
+        const tbody = document.querySelector('#usersTable tbody');
+        tbody.innerHTML = '';
         users.forEach(user => {
-            const activeText = user.active ? `<span style="color: #00ff90;">True</span>` : "False";
-            const roleText = user.role === 'judge' ? `<span style="color:rgb(253, 89, 83);">${user.role}</span>` : user.role;
-            userRows += `<tr>
-                <td>${user.id}</td>
-                <td>${user.nationalId}</td>
-                <td>${user.firstName}</td>
-                <td>${user.lastName}</td>
-                <td>${user.mobile}</td>
-                <td>${roleText}</td>
-                <td>${activeText}</td>
-                <td>
-                    <a href="/admin/edit/${user.id}" target="_blank">edit</a> |
-                    <form action="/admin/delete/${user.id}" method="POST" style="display:inline;">
-                        <button type="submit">delete</button>
-                    </form>
-                </td>
-            </tr>`;
+          const tr = document.createElement('tr');
+          tr.innerHTML = \`
+            <td>\${user.id}</td>
+            <td>\${user.nationalId}</td>
+            <td>\${user.firstName}</td>
+            <td>\${user.lastName}</td>
+            <td>\${user.mobile}</td>
+            <td>\${user.role}</td>
+            <td>\${user.active ? 'True' : 'False'}</td>
+            <td>
+                <a href="/admin/edit/\${user.id}" target="_blank">edit</a> |
+                <form action="/admin/delete/\${user.id}" method="POST" style="display:inline;">
+                    <button type="submit">delete</button>
+                </form>
+            </td>
+          \`;
+          tbody.appendChild(tr);
         });
-        const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>user list</title>
-            <link rel="stylesheet" href="/css/style.css">
-        </head>
-        <body>
-            <div class="admin-menu">
-                <button onclick="window.location.href='/admin/team'">گروه‌ها</button>
-            </div>
-            <table>
-                <tr>
-                    <th>ID</th>
-                    <th>کد ملی</th>
-                    <th>نام</th>
-                    <th>نام خانوادگی</th>
-                    <th>شماره همراه</th>
-                    <th>نقش</th>
-                    <th>فعال</th>
-                    <th>عملیات</th>
-                </tr>
-                ${userRows}
-            </table>
-        </body>
-        </html>
-        `;
-        res.send(html);
-    } catch(err) {
-        console.error(err);
-        res.redirect('/error?message=' + encodeURIComponent("خطا در بارگذاری پنل ادمین.") + "&back=/admin");
-    }
+      }
+      function filterTable(tableId, colIndex) {
+        const input = document.querySelector(\`#\${tableId} thead tr th:nth-child(\${colIndex+1}) input\`);
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById(tableId);
+        const tr = table.getElementsByTagName("tr");
+        for (let i = 1; i < tr.length; i++) {
+          const td = tr[i].getElementsByTagName("td")[colIndex];
+          if (td) {
+            const txtValue = td.textContent || td.innerText;
+            tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+          }
+        }
+      }
+      fetchUsers();
+      setInterval(fetchUsers, 3000);
+      </script>
+  </body>
+  </html>
+  `;
+  res.send(html);
 });
 
-// صفحه ویرایش کاربر (ادمین) – محتوا در مودال نمایش داده می‌شود
+// Endpoint JSON برای کاربران ادمین
+app.get('/admin/users/json', async (req, res) => {
+  try {
+    const users = await User.findAll();
+    const data = users.map(user => ({
+      id: user.id,
+      nationalId: user.nationalId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      mobile: user.mobile,
+      role: user.role,
+      active: user.active
+    }));
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// صفحه ویرایش کاربر (ادمین) – مودال
 app.get('/admin/edit/:id', async (req, res) => {
     if (!req.session.admin) return res.redirect('/admin');
     try {
@@ -170,7 +218,7 @@ app.get('/admin/edit/:id', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>edit user</title>
+            <title>ویرایش کاربر</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
         <body>
@@ -209,8 +257,6 @@ app.get('/admin/edit/:id', async (req, res) => {
     }
 });
 
-
-
 app.post('/admin/edit/:id', async (req, res) => {
     if (!req.session.admin) return res.redirect('/admin');
     try {
@@ -231,8 +277,6 @@ app.post('/admin/edit/:id', async (req, res) => {
     }
 });
 
-
-
 app.post('/admin/delete/:id', async (req, res) => {
     if (!req.session.admin) return res.redirect('/admin');
     try {
@@ -244,67 +288,111 @@ app.post('/admin/delete/:id', async (req, res) => {
     }
 });
 
-
-// مدیریت گروه‌ها در پنل ادمین
-app.get('/admin/team', async (req, res) => {
-    if(!req.session.admin) return res.redirect('/admin');
-    try {
-        const teams = await Team.findAll();
-        let teamRows = '';
-        for(let team of teams) {
-            const leader = await User.findByPk(team.leaderId);
-            const members = await User.findAll({ where: { teamId: team.id } });
-            teamRows += `<tr>
-                <td>${team.id}</td>
-                <td>${team.teamName}</td>
-                <td>${team.teamCode}</td>
-                <td>${leader ? leader.firstName + ' ' + leader.lastName : 'N/A'}</td>
-                <td>${members.length}</td>
-                <td>${team.score}</td>
-                <td>
-                    <a href="/admin/team/edit/${team.id}" target="_blank">edit</a> |
-                    <form action="/admin/team/delete/${team.id}" method="POST" style="display:inline;">
-                        <button type="submit">delete</button>
-                    </form>
-                </td>
-            </tr>`;
+// صفحه گروه‌ها (ادمین) با جدول داینامیک و فیلتر ستونی
+app.get('/admin/team', (req, res) => {
+  if(!req.session.admin) return res.redirect('/admin');
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>پنل ادمین - گروه‌ها</title>
+      <link rel="stylesheet" href="/css/style.css">
+      <style>
+        table input { width: 90%; }
+      </style>
+  </head>
+  <body>
+      <div class="admin-menu">
+          <button onclick="window.location.href='/admin/panel'">کاربران</button>
+          <button onclick="window.location.href='/admin/transactions'">تراکنش‌ها</button>
+      </div>
+      <table id="teamsTable" border="1" cellpadding="5" cellspacing="0">
+        <thead>
+          <tr>
+              <th>ID<br><input type="text" onkeyup="filterTable('teamsTable', 0)" placeholder="جستجو"></th>
+              <th>نام گروه<br><input type="text" onkeyup="filterTable('teamsTable', 1)" placeholder="جستجو"></th>
+              <th>کد گروه<br><input type="text" onkeyup="filterTable('teamsTable', 2)" placeholder="جستجو"></th>
+              <th>سرگروه<br><input type="text" onkeyup="filterTable('teamsTable', 3)" placeholder="جستجو"></th>
+              <th>تعداد اعضا<br><input type="text" onkeyup="filterTable('teamsTable', 4)" placeholder="جستجو"></th>
+              <th>امتیاز<br><input type="text" onkeyup="filterTable('teamsTable', 5)" placeholder="جستجو"></th>
+              <th>عملیات</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <script>
+      async function fetchTeams() {
+        const response = await fetch('/admin/teams/json');
+        const teams = await response.json();
+        const tbody = document.querySelector('#teamsTable tbody');
+        tbody.innerHTML = '';
+        teams.forEach(team => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = \`
+            <td>\${team.id}</td>
+            <td>\${team.teamName}</td>
+            <td>\${team.teamCode}</td>
+            <td>\${team.leaderId || '-'}</td>
+            <td>\${team.memberCount || '-'}</td>
+            <td>\${team.score}</td>
+            <td>
+                <a href="/admin/team/edit/\${team.id}" target="_blank">edit</a> |
+                <form action="/admin/team/delete/\${team.id}" method="POST" style="display:inline;">
+                    <button type="submit">delete</button>
+                </form>
+            </td>
+          \`;
+          tbody.appendChild(tr);
+        });
+      }
+      function filterTable(tableId, colIndex) {
+        const input = document.querySelector(\`#\${tableId} thead tr th:nth-child(\${colIndex+1}) input\`);
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById(tableId);
+        const tr = table.getElementsByTagName("tr");
+        for (let i = 1; i < tr.length; i++) {
+          const td = tr[i].getElementsByTagName("td")[colIndex];
+          if (td) {
+            const txtValue = td.textContent || td.innerText;
+            tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+          }
         }
-        const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>team list</title>
-            <link rel="stylesheet" href="/css/style.css">
-        </head>
-        <body>
-            <div class="admin-menu">
-                <button onclick="window.location.href='/admin/panel'">کاربران</button>
-            </div>
-            <table>
-                <tr>
-                    <th>ID</th>
-                    <th>نام گروه</th>
-                    <th>کد گروه</th>
-                    <th>سرگروه</th>
-                    <th>تعداد اعضا</th>
-                    <th>امتیاز</th>
-                    <th>عملیات</th>
-                </tr>
-                ${teamRows}
-            </table>
-        </body>
-        </html>
-        `;
-        res.send(html);
-    } catch(err) {
-        console.error(err);
-        res.redirect('/error?message=' + encodeURIComponent("خطا در نمایش گروه‌ها.") + "&back=/admin/panel");
-    }
+      }
+      fetchTeams();
+      setInterval(fetchTeams, 3000);
+      </script>
+  </body>
+  </html>
+  `;
+  res.send(html);
 });
 
+// Endpoint JSON برای گروه‌ها (ادمین)
+app.get('/admin/teams/json', async (req, res) => {
+  try {
+    const teams = await Team.findAll();
+    // در اینجا memberCount را به صورت اختیاری محاسبه می‌کنیم؛ برای مثال در صورت نیاز می‌توانید از join استفاده کنید.
+    const data = await Promise.all(teams.map(async team => {
+      const members = await User.findAll({ where: { teamId: team.id } });
+      return {
+        id: team.id,
+        teamName: team.teamName,
+        teamCode: team.teamCode,
+        leaderId: team.leaderId,
+        memberCount: members.length,
+        score: team.score
+      };
+    }));
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
+// صفحه ویرایش گروه (ادمین)
 app.get('/admin/team/edit/:id', async (req, res) => {
     if (!req.session.admin) return res.redirect('/admin');
     try {
@@ -317,7 +405,7 @@ app.get('/admin/team/edit/:id', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>team editing</title>
+            <title>ویرایش گروه</title>
             <link rel="stylesheet" href="/css/style.css">
         </head>
         <body>
@@ -346,7 +434,6 @@ app.get('/admin/team/edit/:id', async (req, res) => {
     }
 });
 
-
 app.post('/admin/team/edit/:id', async (req, res) => {
     if (!req.session.admin) return res.redirect('/admin');
     try {
@@ -365,7 +452,6 @@ app.post('/admin/team/edit/:id', async (req, res) => {
     }
 });
 
-
 app.post('/admin/team/delete/:id', async (req, res) => {
     if(!req.session.admin) return res.redirect('/admin');
     try {
@@ -380,9 +466,103 @@ app.post('/admin/team/delete/:id', async (req, res) => {
     }
 });
 
+// صفحه تراکنش‌ها (ادمین) با جستجوی ستونی و به‌روزرسانی خودکار
+app.get('/admin/transactions', (req, res) => {
+  if (!req.session.admin) return res.redirect('/admin');
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>پنل ادمین - تراکنش‌ها</title>
+      <link rel="stylesheet" href="/css/style.css">
+      <style>
+        table input { width: 90%; }
+      </style>
+  </head>
+  <body>
+      <div class="admin-menu">
+          <button onclick="window.location.href='/admin/panel'">کاربران</button>
+          <button onclick="window.location.href='/admin/team'">گروه‌ها</button>
+      </div>
+      <table id="transactionsTable" border="1" cellpadding="5" cellspacing="0">
+        <thead>
+          <tr>
+              <th>ID<br><input type="text" onkeyup="filterTable('transactionsTable', 0)" placeholder="جستجو"></th>
+              <th>نوع<br><input type="text" onkeyup="filterTable('transactionsTable', 1)" placeholder="جستجو"></th>
+              <th>توضیحات<br><input type="text" onkeyup="filterTable('transactionsTable', 2)" placeholder="جستجو"></th>
+              <th>آیدی کاربر<br><input type="text" onkeyup="filterTable('transactionsTable', 3)" placeholder="جستجو"></th>
+              <th>آیدی گروه<br><input type="text" onkeyup="filterTable('transactionsTable', 4)" placeholder="جستجو"></th>
+              <th>زمان<br><input type="text" onkeyup="filterTable('transactionsTable', 5)" placeholder="جستجو"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <script>
+      async function fetchTransactions() {
+        const response = await fetch('/admin/transactions/json');
+        const transactions = await response.json();
+        const tbody = document.querySelector('#transactionsTable tbody');
+        tbody.innerHTML = '';
+        transactions.forEach(tx => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = \`
+            <td>\${tx.id}</td>
+            <td>\${tx.type}</td>
+            <td>\${tx.description}</td>
+            <td>\${tx.userId || '-'}</td>
+            <td>\${tx.teamId || '-'}</td>
+            <td>\${tx.createdAt}</td>
+          \`;
+          tbody.appendChild(tr);
+        });
+      }
+      function filterTable(tableId, colIndex) {
+        const input = document.querySelector(\`#\${tableId} thead tr th:nth-child(\${colIndex+1}) input\`);
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById(tableId);
+        const tr = table.getElementsByTagName("tr");
+        for (let i = 1; i < tr.length; i++) {
+          const td = tr[i].getElementsByTagName("td")[colIndex];
+          if (td) {
+            const txtValue = td.textContent || td.innerText;
+            tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+          }
+        }
+      }
+      fetchTransactions();
+      setInterval(fetchTransactions, 3000);
+      </script>
+  </body>
+  </html>
+  `;
+  res.send(html);
+});
 
+// Endpoint JSON برای تراکنش‌ها (ادمین)
+app.get('/admin/transactions/json', async (req, res) => {
+  try {
+    const transactions = await Transaction.findAll({ order: [['createdAt', 'DESC']] });
+    const data = transactions.map(tx => ({
+      id: tx.id,
+      type: tx.type,
+      description: tx.description,
+      userId: tx.userId,
+      teamId: tx.teamId,
+      createdAt: tx.createdAt
+    }));
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
-// مسیرهای مربوط به پنل دانش‌آموز
+// ====================
+// مسیرهای مربوط به پنل داور و دانش‌آموز (تغییرات قدیمی حفظ شده)
+// ====================
+
 app.get('/judge', async (req, res) => {
     if (!req.session.user || req.session.user.role !== 'judge') return res.redirect('/login');
     try {
@@ -414,7 +594,6 @@ app.get('/judge', async (req, res) => {
     }
 });
 
-
 app.post('/judge/award', async (req, res) => {
     if (!req.session.user || req.session.user.role !== 'judge') return res.redirect('/login');
     try {
@@ -423,7 +602,7 @@ app.post('/judge/award', async (req, res) => {
         const team = await Team.findOne({ where: { walletCode } });
         if (!team) return res.redirect('/error?message=' + encodeURIComponent("گروهی با این کد یافت نشد.") + "&back=/judge");
         
-        // نمایش صفحه تایید انتقال امتیاز با استایل
+        // صفحه تایید انتقال امتیاز
         const html = `
         <!DOCTYPE html>
         <html>
@@ -472,6 +651,15 @@ app.post('/judge/award/confirm', async (req, res) => {
         if (!team) return res.redirect('/error?message=' + encodeURIComponent("گروه یافت نشد.") + "&back=/judge");
         team.score += transferAmount;
         await team.save();
+
+        // ثبت تراکنش انتقال امتیاز توسط داور
+        await Transaction.create({
+          type: 'score_award',
+          description: `انتقال امتیاز به گروه "${team.teamName}" به مبلغ ${transferAmount}.`,
+          teamId: team.id,
+          details: { amount: transferAmount }
+        });
+
         res.redirect('/judge');
     } catch (err) {
         console.error(err);
@@ -479,7 +667,7 @@ app.post('/judge/award/confirm', async (req, res) => {
     }
 });
 
-// لیست گروه‌های داور با به‌روزرسانی هر 3 ثانیه
+// لیست گروه‌های داور
 app.get('/judge/groups', async (req, res) => {
     if(!req.session.user || req.session.user.role !== 'judge') return res.redirect('/login');
     try {
@@ -501,7 +689,7 @@ app.get('/judge/groups', async (req, res) => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>team list</title>
+          <title>لیست گروه‌ها</title>
           <link rel="stylesheet" href="/css/style.css">
           <script src="/js/modal.js"></script>
           <script>
@@ -547,7 +735,7 @@ app.get('/judge/groups', async (req, res) => {
     }
 });
 
-// Endpoint JSON جهت به‌روزرسانی امتیازات گروه‌ها
+// Endpoint JSON جهت به‌روزرسانی امتیازات گروه‌ها (داور)
 app.get('/judge/groups/json', async (req, res) => {
     if(!req.session.user || req.session.user.role !== 'judge') return res.status(401).json({ error: "Unauthorized" });
     try {
@@ -608,7 +796,6 @@ app.get('/judge/groups/award', async (req, res) => {
     }
 });
 
-// پردازش تایید انتقال امتیاز گروه (داور)
 app.post('/judge/groups/award/confirm', async (req, res) => {
     if(!req.session.user || req.session.user.role !== 'judge') return res.redirect('/login');
     try {
@@ -618,6 +805,15 @@ app.post('/judge/groups/award/confirm', async (req, res) => {
         if(!team) return res.redirect('/error?message=' + encodeURIComponent("گروه یافت نشد.") + "&back=/judge/groups");
         team.score += transferAmount;
         await team.save();
+
+        // ثبت تراکنش انتقال امتیاز توسط داور
+        await Transaction.create({
+          type: 'score_award',
+          description: `انتقال امتیاز به گروه "${team.teamName}" به مبلغ ${transferAmount}.`,
+          teamId: team.id,
+          details: { amount: transferAmount }
+        });
+
         res.redirect('/judge/groups');
     } catch(err) {
         console.error(err);
@@ -625,7 +821,7 @@ app.post('/judge/groups/award/confirm', async (req, res) => {
     }
 });
 
-
+// مسیر پنل دانش‌آموز (تغییرات قدیمی)
 app.get('/student', async (req, res) => {
     if (!req.session.user || req.session.user.role !== 'student') return res.redirect('/login');
     try {
@@ -668,9 +864,8 @@ app.get('/student', async (req, res) => {
                         <ul>اعضا:
                            ${memberList}
                         </ul>`;
-            // دکمه مدیریتی: اگر سرگروه است، دکمه حذف گروه؛ در غیر این صورت دکمه خروج از گروه
             if (team.leaderId === user.id) {
-                html += `<button onclick="openModal('/confirm?message=' + encodeURIComponent('آیا مطمئن هستید؟ حذف گروه تمامی اعضا را از گروه خارج می‌کند؟') + '&action=/team/delete&cancel=/student')">حذف گروه</button>`;
+                html += `<button onclick="openModal('/confirm?message=' + encodeURIComponent('آیا مطمئن هستید؟ حذف گروه تمامی اعضا را از گروه خارج می‌کند.') + '&action=/team/delete&cancel=/student')">حذف گروه</button>`;
             } else {
                 html += `<button onclick="openModal('/confirm?message=' + encodeURIComponent('آیا مطمئن هستید که می‌خواهید از گروه خارج شوید؟') + '&action=/team/leave&cancel=/student')">خروج از گروه</button>`;
             }
@@ -719,7 +914,6 @@ app.get('/student', async (req, res) => {
                 try {
                   const response = await fetch('/scoreboard/json');
                   const teams = await response.json();
-                  // مرتب‌سازی گروه‌ها به ترتیب نزولی امتیاز و انتخاب ۵ گروه برتر
                   const topTeams = teams.sort((a, b) => b.score - a.score).slice(0, 5);
                   const list = document.getElementById('top-teams');
                   list.innerHTML = '';
@@ -745,8 +939,6 @@ app.get('/student', async (req, res) => {
         res.redirect('/error?message=' + encodeURIComponent("خطا در بارگذاری پنل دانش‌آموز.") + "&back=/login");
     }
 });
-
-
 
 // مسیر تغییر شماره همراه دانش‌آموز (مودال)
 app.get('/student/updateMobile', async (req, res) => {
@@ -867,6 +1059,16 @@ app.post('/team/create', async (req, res) => {
         });
         user.teamId = newTeam.id;
         await user.save();
+
+        // ثبت تراکنش ایجاد گروه
+        await Transaction.create({
+          type: 'team_creation',
+          description: `گروه "${newTeam.teamName}" با کد "${newTeam.teamCode}" ایجاد شد.`,
+          userId: user.id,
+          teamId: newTeam.id,
+          details: { walletCode: newTeam.walletCode }
+        });
+
         res.redirect('/student');
     } catch(err) {
         console.error(err);
@@ -904,6 +1106,16 @@ app.post('/team/join', async (req, res) => {
         if(members.length >= 3) return res.redirect('/error?message=' + encodeURIComponent("گروه پر است.") + "&back=/student");
         user.teamId = team.id;
         await user.save();
+
+        // ثبت تراکنش پیوستن به گروه
+        await Transaction.create({
+          type: 'team_join',
+          description: `کاربر ${user.firstName} ${user.lastName} به گروه "${team.teamName}" پیوست.`,
+          userId: user.id,
+          teamId: team.id,
+          details: {}
+        });
+
         res.redirect('/student');
     } catch(err) {
         console.error(err);
@@ -911,27 +1123,30 @@ app.post('/team/join', async (req, res) => {
     }
 });
 
-
 app.post('/team/leave', async (req, res) => {
     if (!req.session.user || req.session.user.role !== 'student') {
         return res.redirect('/login');
     }
     try {
         const user = await User.findByPk(req.session.user.id);
-        
         if (!user.teamId) {
             return res.redirect('/error?message=' + encodeURIComponent("شما عضو هیچ گروهی نیستید.") + "&back=/student");
         }
-
         const team = await Team.findByPk(user.teamId);
-
         if (team.leaderId === user.id) {
             return res.redirect('/error?message=' + encodeURIComponent("سرگروه نمی‌تواند از گروه خارج شود. برای حذف گروه از گزینه حذف استفاده کنید.") + "&back=/student");
         }
-
-        // خروج از گروه (پاک کردن teamId کاربر)
         user.teamId = null;
         await user.save();
+
+        // ثبت تراکنش خروج از گروه
+        await Transaction.create({
+          type: 'team_leave',
+          description: `کاربر ${user.firstName} ${user.lastName} از گروه "${team.teamName}" خارج شد.`,
+          userId: user.id,
+          teamId: team.id,
+          details: {}
+        });
 
         res.redirect('/student');
     } catch (err) {
@@ -949,6 +1164,16 @@ app.post('/team/delete', async (req, res) => {
         if(team.leaderId !== user.id) return res.redirect('/error?message=' + encodeURIComponent("فقط سرگروه می‌تواند گروه را حذف کند.") + "&back=/team");
         await User.update({ teamId: null }, { where: { teamId: team.id } });
         await Team.destroy({ where: { id: team.id } });
+
+        // ثبت تراکنش حذف گروه
+        await Transaction.create({
+          type: 'team_deletion',
+          description: `گروه "${team.teamName}" توسط سرگروه حذف شد.`,
+          userId: user.id,
+          teamId: team.id,
+          details: {}
+        });
+
         res.redirect('/student');
     } catch(err) {
         console.error(err);
@@ -1004,6 +1229,7 @@ app.post('/student/wallet/transfer', async (req, res) => {
                     </form>
                 </div>
             </body>
+        </html>
         `;
         res.send(html);
     } catch (err) {
@@ -1011,7 +1237,6 @@ app.post('/student/wallet/transfer', async (req, res) => {
         res.redirect('/error?message=' + encodeURIComponent("خطا در انتقال امتیاز.") + "&back=/student");
     }
 });
-
 
 app.post('/student/wallet/transfer/confirm', async (req, res) => {
     if(!req.session.user || req.session.user.role !== 'student') return res.redirect('/login');
@@ -1034,6 +1259,16 @@ app.post('/student/wallet/transfer/confirm', async (req, res) => {
         destTeam.score += transferAmount;
         await team.save();
         await destTeam.save();
+
+        // ثبت تراکنش انتقال امتیاز بین گروه‌ها
+        await Transaction.create({
+          type: 'score_transfer',
+          description: `انتقال امتیاز از گروه "${team.teamName}" به گروه "${destTeam.teamName}" به مبلغ ${transferAmount}.`,
+          userId: user.id,
+          teamId: team.id,
+          details: { amount: transferAmount, destTeamId: destTeam.id }
+        });
+
         res.redirect('/student');
     } catch(err) {
         console.error(err);
@@ -1041,8 +1276,7 @@ app.post('/student/wallet/transfer/confirm', async (req, res) => {
     }
 });
 
-
-// Endpoint JSON برای جدول امتیازات
+// Endpoint JSON برای جدول امتیازات (scoreboard)
 app.get('/scoreboard/json', async (req, res) => {
     try {
       const teams = await Team.findAll();
@@ -1059,41 +1293,7 @@ app.get('/scoreboard/json', async (req, res) => {
     }
 });  
   
-// Endpoint JSON برای جدول امتیازات
-app.get('/scoreboard/json', async (req, res) => {
-    try {
-      const teams = await Team.findAll();
-      const data = teams.map(team => ({
-        id: team.id,
-        teamName: team.teamName,
-        teamCode: team.teamCode,
-        score: team.score
-      }));
-      res.json(data);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
-  });
-
-// Endpoint JSON برای اسکوربورد
-app.get('/scoreboard/json', async (req, res) => {
-    try {
-      const teams = await Team.findAll();
-      const data = teams.map(team => ({
-        id: team.id,
-        teamName: team.teamName,
-        teamCode: team.teamCode,
-        score: team.score
-      }));
-      res.json(data);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
-  });
-  
-// صفحه کامل اسکوربورد مسابقه (به‌روزرسانی هر 1 ثانیه)
+// صفحه کامل اسکوربورد مسابقه
 app.get('/scoreboard/full', async (req, res) => {
     let myTeamId = null;
     if (req.session.user && req.session.user.role === 'student') {
@@ -1121,7 +1321,6 @@ app.get('/scoreboard/full', async (req, res) => {
           width: 100%;
           height: 100vh;
         }
-        /* دایره‌ها: اندازه 3px، انتقال با انیمیشن */
         .team-circle {
           position: absolute;
           width: 3px;
@@ -1140,7 +1339,6 @@ app.get('/scoreboard/full', async (req, res) => {
           box-shadow: 0 0 3px rgba(255,0,0,0.8);
           z-index: 3;
         }
-        /* خطوط امتیاز: از لبه‌های صفحه (left=0,right=0) و با transition */
         .score-line {
           position: absolute;
           height: 1px;
@@ -1171,13 +1369,12 @@ app.get('/scoreboard/full', async (req, res) => {
       <div class="scoreboard-container" id="scoreboard-container"></div>
       <script>
         const myTeamId = ${myTeamId ? myTeamId : 'null'};
-        const prevLinePositions = {}; // ذخیره موقعیت قبلی خطوط
+        const prevLinePositions = {};
         
         async function updateScoreboard() {
           try {
             const response = await fetch('/scoreboard/json');
             const teams = await response.json();
-            // مرتب‌سازی تیم‌ها بر اساس teamCode (صعودی)
             teams.sort((a, b) => a.teamCode.localeCompare(b.teamCode));
             const container = document.getElementById('scoreboard-container');
             const containerHeight = window.innerHeight;
@@ -1185,7 +1382,6 @@ app.get('/scoreboard/full', async (req, res) => {
             const topMargin = 50;
             const bottomMargin = 50;
             const availableHeight = containerHeight - topMargin - bottomMargin;
-            // دایره‌ها باید حداقل 30px از لبه صفحه فاصله داشته باشند
             const leftMargin = 30, rightMargin = 30;
             const availableWidth = containerWidth - leftMargin - rightMargin;
             const gap = teams.length > 1 ? availableWidth / (teams.length - 1) : 0;
@@ -1194,10 +1390,8 @@ app.get('/scoreboard/full', async (req, res) => {
               const maxScore = Math.max(...teams.map(t => t.score), 1000);
               const ratio = team.score / maxScore;
               const topPos = topMargin + (1 - ratio) * availableHeight;
-              // موقعیت افقی بر اساس مرتب‌سازی (دایره‌ها از leftMargin شروع می‌شوند)
               const leftPos = leftMargin + index * gap;
               
-              // به‌روزرسانی یا ایجاد دایره تیم
               let circle = document.getElementById('circle-' + team.id);
               if (!circle) {
                 circle = document.createElement('div');
@@ -1216,7 +1410,6 @@ app.get('/scoreboard/full', async (req, res) => {
               circle.style.top = topPos + 'px';
               circle.style.left = leftPos + 'px';
               
-              // به‌روزرسانی یا ایجاد خط امتیاز
               let scoreLine = document.getElementById('scoreline-' + team.id);
               if (!scoreLine) {
                 scoreLine = document.createElement('div');
@@ -1232,7 +1425,6 @@ app.get('/scoreboard/full', async (req, res) => {
               const newTop = topPos + 1.5;
               scoreLine.style.top = newTop + 'px';
               
-              // اعمال افکت درخشش: فقط اگر تغییر موقعیت بیشتر از 1px بوده باشد
               if (!prevLinePositions[team.id] || Math.abs(newTop - prevLinePositions[team.id]) > 1) {
                 if (typeof myTeamId === 'number' && myTeamId === team.id) {
                   scoreLine.style.boxShadow = "0 0 10px red";
@@ -1246,7 +1438,6 @@ app.get('/scoreboard/full', async (req, res) => {
               prevLinePositions[team.id] = newTop;
             });
             
-            // حذف عناصری که در teams موجود نیستند
             const existingCircles = container.querySelectorAll('.team-circle');
             existingCircles.forEach(circle => {
               const id = circle.id.replace('circle-', '');
@@ -1292,9 +1483,6 @@ app.get('/scoreboard/full', async (req, res) => {
     res.send(html);
 });
   
-  
-  
-
 // صفحه خطا
 app.get('/error', (req, res) => {
     const message = req.query.message || "خطایی رخ داده است.";
@@ -1348,9 +1536,6 @@ app.get('/confirm', (req, res) => {
     `;
     res.send(html);
 });
-
-
-
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
