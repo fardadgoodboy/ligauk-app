@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
     secret: 'yourSecretKey', // Choose a proper secret key
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: true
 }));
 
 // Sync database models
@@ -193,7 +193,7 @@ app.get('/admin/panel', (req, res) => {
           }
         }
         fetchUsers();
-        setInterval(fetchUsers, 3000);
+        setInterval(fetchUsers, 10000);
         </script>
     </body>
     </html>
@@ -378,7 +378,7 @@ app.get('/admin/team', (req, res) => {
           }
         }
         fetchTeams();
-        setInterval(fetchTeams, 3000);
+        setInterval(fetchTeams, 10000);
         </script>
     </body>
     </html>
@@ -553,7 +553,7 @@ app.get('/admin/transactions', (req, res) => {
           }
         }
         fetchTransactions();
-        setInterval(fetchTransactions, 3000);
+        setInterval(fetchTransactions, 10000);
         </script>
     </body>
     </html>
@@ -726,7 +726,7 @@ app.get('/judge/groups', async (req, res) => {
                 console.error('خطا در به‌روزرسانی گروه‌ها:', error);
               }
             }
-            setInterval(refreshGroups, 3000);
+            setInterval(refreshGroups, 10000);
           </script>
         </head>
         <body>
@@ -939,7 +939,7 @@ app.get('/student', async (req, res) => {
                 }
               }
               updateTopTeams();
-              setInterval(updateTopTeams, 3000);
+              setInterval(updateTopTeams, 60000);
             </script>
             <script src="/js/modal.js"></script>
         </body>
@@ -1535,7 +1535,7 @@ app.get('/scoreboard/full', async (req, res) => {
         }
         
         updateScoreboard();
-        setInterval(updateScoreboard, 1000);
+        setInterval(updateScoreboard, 10000);
       </script>
     </body>
     </html>
