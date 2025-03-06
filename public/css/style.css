@@ -286,10 +286,10 @@ table input {
 
 /* Operation button styles */
 .op-edit {
-    color: blue;
+    color: skyblue;
 }
 .op-delete {
-    color: red;
+    color: palevioletred;
     background: none;
     border: none;
     cursor: pointer;
@@ -297,7 +297,7 @@ table input {
 
 /* Active status styles */
 .active-true {
-    color: green;
+    color: lightgreen;
 }
 .active-false {
     color: gray;
@@ -305,7 +305,7 @@ table input {
 
 /* Role styles */
 .role-judge {
-    color: red;
+    color: lightcoral;
 }
 
 /* Transaction type color classes */
