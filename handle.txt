@@ -1,0 +1,9 @@
+pm2 start app.js -i max
+pm2 stop all
+pm2 kill
+
+
+sudo systemctl start nginx     # شروع سرویس
+sudo systemctl stop nginx      # متوقف کردن سرویس
+sudo systemctl restart nginx   # راه‌اندازی مجدد
+sudo systemctl reload nginx    # بارگذاری مجدد پیکربندی بدون توقف سرویس
