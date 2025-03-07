@@ -30,4 +30,4 @@ setInterval(async () => {
   } catch (error) {
     console.error("Error updating scores:", error);
   }
-}, 50);
+}, 100);
